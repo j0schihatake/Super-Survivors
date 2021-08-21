@@ -16,7 +16,7 @@ function ListenTask:new(superSurvivor, TalkToMe, selfInitiated)
 	o.TicksSinceLastExchange = 0
 	o.Spoke = false
 	o.IsNPConNPC = ((o.parent.player:isLocalPlayer() == false) and (TalkToMe:isLocalPlayer() == false))
-	StopWalk(o.parent.player)
+	o.parent:StopWalk()
 	superSurvivor:Speak("!?")
 	
 	return o
@@ -33,7 +33,7 @@ function ListenTask:isComplete()
 end
 
 function ListenTask:isValid()
-	if not self.parent or not self.Aite then return false 
+	if not self.parent or not self.Aite or not self.SSAite then return false 
 	else return true end
 end
 
@@ -51,7 +51,7 @@ function ListenTask:update()
 		if (distance > 1.8) then
 			self.parent:walkTo(self.Aite:getCurrentSquare()) 				 		
 		else
-			StopWalk(self.parent.player)
+			self.parent:StopWalk()
 			self.parent.player:faceThisObject(self.Aite)
 			if(self.Spoke == false) then
 				self.Spoke = true
@@ -61,7 +61,9 @@ function ListenTask:update()
 				elseif(self.WasSelfInit) then self.parent:Speak(getText("ContextMenu_SD_HiThere"))				
 				else self.parent:Speak(getText("ContextMenu_SD_WhatYouWant")) end
 			elseif(self.parent.player:isLocalPlayer() == false) then
-				if(ZombRand(2) == 0) and (self.parent:isSpeaking()==false) and (self.SSAite:isSpeaking() == false) then
+				if(ZombRand(2) == 0) and 
+				(self.parent:isSpeaking()==false) and 
+				(self.SSAite:isSpeaking() == false) then
 					self.parent:Speak(getSpeech("IdleChatter"))					
 				end
 			end

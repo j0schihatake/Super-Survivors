@@ -131,7 +131,7 @@ function GroupWindow:Update()
 		--local basebounds = Group:getBounds()
 		local base = ""
 		if(baseloc ~= nil) then base = tostring(baseloc:getX())..","..tostring(baseloc:getY()) end
-		self:setHeaderText(getText("ContextMenu_SD_BaseLocation")..": "..base)
+		self:setHeaderText(getText("ContextMenu_SD_BaseLocation").."(".. getSpecificPlayer(0):getModData().Group .."): "..base)
 	end
 	
 	self.HomeWindow:sort()

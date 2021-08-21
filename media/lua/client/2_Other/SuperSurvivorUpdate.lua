@@ -1,247 +1,167 @@
 
-function WalkToUpdate(player)
-        
-    if(player:getModData().bWalking) then
-		local basespeed = 0.08 
-		if(player:getModData().Running == true) then 
-			basespeed = 0.12
-			if(player.isForceOverrideAnim ~= nil) then
-				if(player:isForceOverrideAnim()) then 
-					if (ClimbOverFenceState.instance() ~= player:getCurrentState()) then
-						local anim = "Run"						
-						if(player:getModData().RunAnim) then anim = player:getModData().RunAnim end
-						player:PlayAnim(anim) 
+function SuperSurvivorPlayerInit(player)
+		
+			player:getModData().isHostile = false
+			player:getModData().semiHostile = false
+			player:getModData().hitByCharacter = false
+			player:getModData().ID = 0
+			player:setBlockMovement(false)
+			player:setNPC(false)	
+			print("initing player index " .. tostring(player:getPlayerNum()) )
+			
+			if(player:getPlayerNum()==0) then
+				print("initing player index 0")
+				SSM:init()
+				MyGroup = SSGM:newGroup()
+				MyGroup:addMember(SSM:Get(0),"Leader")			
+				local spawnBuilding = SSM:Get(0):getBuilding()
+				if(spawnBuilding) then -- spawn building is default group base
+					print("set building "..tostring(MyGroup:getID()))
+					local def = spawnBuilding:getDef()
+					local bounds = {def:getX(),(def:getX() + def:getW()), def:getY(),(def:getY() + def:getH()),0}
+					MyGroup:setBounds(bounds)
+				else
+					print("did not spawn in building")
+				end
+			
+			
+				local wife
+				if(player:getModData().WifeID == nil) and (SuperSurvivorGetOptionValue("WifeSpawn") == true) then					
+						
+					player:getModData().WifeID = 0;
+								
+					wife = SSM:spawnSurvivor(not player:isFemale(), player:getCurrentSquare());
+					
+					local MData = wife:Get():getModData();
+					if(player:isFemale()) then	
+						wife:setName(getText("ContextMenu_SD_Husband"));
 					else
-						StopWalk(player)
-						SSM:Get(player:getModData().ID):Wait(4)
+						wife:setName(getText("ContextMenu_SD_Wife"));
 					end
-				end
-			end
-		
-		end
-		
-		local realspeed = basespeed - (player:getSlowFactor() * basespeed)
-        player:setMoveSpeed(realspeed);
-		
-		
-        local myBehaviorResult = player:getPathFindBehavior2():update() 
-		
-      -- if(player:isSpeaking() == false) then player:Say(tostring(myBehaviorResult)) end
-        if((myBehaviorResult == BehaviorResult.Failed) or (myBehaviorResult == BehaviorResult.Succeeded)) then   
-            StopWalk(player)
-        end
-   else
-	--getSpecificPlayer(0):Say(tostring(SurvivorInfiniteAmmo))
-   end
-end
-
-function StopWalk(player)
-
-  if(player.setForceOverrideAnim ~= nil) then player:setForceOverrideAnim(false) end
-  player:StopAllActionQueue()
-  player:setPath2(nil)
-  player:getModData().bWalking = false
-  player:getModData().Running = false
-  
-end
-
-RealPlayerInitDone = false
-function SuperSurvivorGlobalUpdate(player)
-
-	if(player:getModData().ForceAnim ~= nil) and (player:isForceOverrideAnim()) then
-		--print("forcing animation: "..tostring(player:getModData().ForceAnim))
-		player:PlayAnim(player:getModData().ForceAnim) 
-		return true
-	end
-
-	if(player:getModData().GCount == nil) then player:getModData().GCount = 0; 
-	else player:getModData().GCount = player:getModData().GCount + 1 ; end
-	local LGCount = player:getModData().GCount;
-	
-	if(LGCount % 600 == 0) then
-		player:getModData().hitByCharacter = false
-		player:getModData().semiHostile = false	
-	end
-	
-	if(not player:isLocalPlayer()) then
-
-		if(player:getLastSquare() ~= nil ) then
-			local cs = player:getCurrentSquare()
-			local ls = player:getLastSquare()
-			local tempdoor = ls:getDoorTo(cs);
-			if(tempdoor ~= nil and tempdoor:IsOpen() ) then
-				 tempdoor:ToggleDoor(player);
-				
-			end		
-		end
-		
-		WalkToUpdate(player)
-		
-	elseif(RealPlayerInitDone == false) then
-	
-		RealPlayerInitDone = true
-		
-		print("pre load count is "..tostring(SSGM:getCount()))
-		SSGM:Load()
-		print("post load count is "..tostring(SSGM:getCount()))
-			
-		if(player:getModData().FirstInit == nil) then -- create a group put player in it, set building spawned in as base for that group
-			MyGroup = SSGM:newGroup()
-			MyGroup:addMember(SSM:Get(0),"Leader")
-			
-			HillTopGroup:AllSpokeTo()
-			BlockadeGroup:AllSpokeTo()
-			--HillTopGroup:addMember(SSM:Get(0),"Leader")
-			
-			local spawnBuilding = SSM:Get(0):getBuilding()
-			if(spawnBuilding) then -- spawn building is default group base
-				print("set building "..tostring(MyGroup:getID()))
-				local def = spawnBuilding:getDef()
-				local bounds = {def:getX(),(def:getX() + def:getW()), def:getY(),(def:getY() + def:getH()),0}
-				MyGroup:setBounds(bounds)
-			else
-				print("did not spawn in building")
-			end
-			player:getModData().FirstInit = true
-		end
-			local wife
-			if(player:getModData().WifeID == nil) and (SuperSurvivorGetOptionValue("WifeSpawn") == true) then					
 					
-				player:getModData().WifeID = 0;
-				if(player:isFemale()) then	
-					isFemale = false;
-				else
-					isFemale = true;
-				end
-				
-				wife = SSM:spawnSurvivor(isFemale, player:getCurrentSquare());
-				
-				local MData = wife:Get():getModData();
-				if(player:isFemale()) then	
-					wife:setName(getText("ContextMenu_SD_Husband"));
-				else
-					wife:setName(getText("ContextMenu_SD_Wife"));
-				end
-				
-				wife:Get():getModData().InitGreeting = getSpeech("WifeIntro");
-				wife:Get():getModData().seenZombie = true;
-				MData.MetPlayer = true;
-				MData.isHostile = false;
-											
-				local GID, Group
-				if(SSM:Get(0):getGroupID() == nil) then
-					print("SSGM:newGroup() "..tostring(SSGM:getCount()))
-					Group = SSGM:newGroup()
-					GID = Group:getID()					
-					Group:addMember(SSM:Get(0),"Leader")
-					print("POST SSGM:newGroup() "..tostring(SSGM:getCount()))
-				else
-					GID = SSM:Get(0):getGroupID()
-					print("main player has group id detected:"..tostring(GID))
-					Group = SSGM:Get(GID)
-				end
-				
-				Group:addMember(wife,"Worker")
-				
-				local followtask = FollowTask:new(wife,getSpecificPlayer(0))
-				local tm = wife:getTaskManager()
-				wife:setAIMode("Follow")
-				tm:AddToTop(followtask)
-				
-				if(ZombRand(100) < (ChanceToSpawnWithGun)) then 
-					wife:giveWeapon(getWeapon(RangeWeapons[ZombRand(1,#RangeWeapons)]),true) 				
-				elseif(ZombRand(100) < (ChanceToSpawnWithWep)) then 
-					wife:giveWeapon(MeleWeapons[ZombRand(1,#MeleWeapons)],true) 
-				end
-				
-				
-			end
-			
-			if(player:getModData().LockNLoad == nil) and (SuperSurvivorGetOptionValue("LockNLoad") == true) then
-				
-				
-				if(isModEnabled("ArmorMod")) then
-					EquipAnyArmor(player:getInventory():AddItem("Armor.ArmorArmarmorswat"),player);
-					EquipAnyArmor(player:getInventory():AddItem("Armor.ArmorArmorswat"),player);
-					EquipAnyArmor(player:getInventory():AddItem("Armor.ArmorHelmswat"),player);
-					EquipAnyArmor(player:getInventory():AddItem("Armor.ArmorLegarmorswat"),player);
-					--EquipAnyArmor(player:getInventory():AddItem("Armor.ArmorBootriot"),player);
-					EquipAnyArmor(player:getInventory():AddItem("Armor.ArmorGloveriot"),player);
-					EquipAnyArmor(player:getInventory():AddItem("Armor.ArmorShieldriot"),player);
-					if(wife) then
-					EquipAnyArmor(wife:Get():getInventory():AddItem("Armor.ArmorArmarmorswat"),wife:Get());
-					EquipAnyArmor(wife:Get():getInventory():AddItem("Armor.ArmorArmorswat"),wife:Get());
-					EquipAnyArmor(wife:Get():getInventory():AddItem("Armor.ArmorHelmswat"),wife:Get());
-					EquipAnyArmor(wife:Get():getInventory():AddItem("Armor.ArmorLegarmorswat"),wife:Get());
-					--EquipAnyArmor(wife:Get():getInventory():AddItem("Armor.ArmorBootriot"),wife:Get());
-					EquipAnyArmor(wife:Get():getInventory():AddItem("Armor.ArmorGloveriot"),wife:Get());
-					EquipAnyArmor(wife:Get():getInventory():AddItem("Armor.ArmorShieldriot"),wife:Get());
+					wife:Get():getModData().InitGreeting = getSpeech("WifeIntro");
+					wife:Get():getModData().seenZombie = true;
+					MData.MetPlayer = true;
+					MData.isHostile = false;
+												
+					local GID, Group
+					if(SSM:Get(0):getGroupID() == nil) then
+						print("SSGM:newGroup() "..tostring(SSGM:getCount()))
+						Group = SSGM:newGroup()
+						GID = Group:getID()					
+						Group:addMember(SSM:Get(0),"Leader")
+						print("POST SSGM:newGroup() "..tostring(SSGM:getCount()))
+					else
+						GID = SSM:Get(0):getGroupID()
+						print("main player has group id detected:"..tostring(GID))
+						Group = SSGM:Get(GID)
 					end
-				end
-				if(isModEnabled("ORGM")) then
-					local gun = player:getInventory():AddItem("ORGM.Mac11")
-					ORGM.setupGun(ORGM.getFirearmData(gun), gun)
-					player:setPrimaryHandItem(gun);
 					
-					local ammoType = "Ammo_380ACP_FMJ"
-					for i=1, 5 do
-						local mag = player:getInventory():AddItem("ORGM.Mac11Mag");
-						ORGM.setupMagazine(ORGM.getMagazineData(mag), mag)
-						local data = mag:getModData() 
-						data.currentCapacity = data.maxCapacity 
-						for i=1, data.maxCapacity do 
-							data.magazineData[i] = ammoType 
-						end 
-						data.loadedAmmo = ammoType
+					Group:addMember(wife,"Worker")
+					
+					local followtask = FollowTask:new(wife,getSpecificPlayer(0))
+					local tm = wife:getTaskManager()
+					wife:setAIMode("Follow")
+					tm:AddToTop(followtask)
+					
+					if(ZombRand(100) < (ChanceToSpawnWithGun)) then 
+						wife:giveWeapon(getWeapon(RangeWeapons[ZombRand(1,#RangeWeapons)]),true) 				
+					elseif(ZombRand(100) < (ChanceToSpawnWithWep)) then 
+						wife:giveWeapon(MeleWeapons[ZombRand(1,#MeleWeapons)],true) 
 					end
-						
-					player:getInventory():AddItem("ORGM.Ammo_380ACP_FMJ_Can");
 					
+					GlobalWife = wife
+					
+				end
+				
+				if(player:getModData().LockNLoad == nil) and (SuperSurvivorGetOptionValue("LockNLoad") == true) then
+					
+					
+					local SSME = SSM:Get(0)
+					SSME:WearThis("Shoes_ArmyBoots")
+					SSME:WearThis("Vest_BulletArmy")
+					SSME:WearThis("Trousers_CamoGreen")
+					SSME:WearThis("Shirt_CamoGreen")
+					SSME:WearThis("Hat_Army")
 					
 					if(wife) then
+						wife:WearThis("Shoes_ArmyBoots")
+						wife:WearThis("Vest_BulletArmy")
+						wife:WearThis("Trousers_CamoGreen")
+						wife:WearThis("Shirt_CamoGreen")
+						wife:WearThis("Hat_Army")
+					end
 					
-						local gun = wife:Get():getInventory():AddItem("ORGM.Mac11")
-						ORGM.setupGun(ORGM.getFirearmData(gun), gun)
-						wife:Get():setPrimaryHandItem(gun);
+					
 						
-						local ammoType = "Ammo_380ACP_FMJ"
-						for i=1, 100 do
-							wife:Get():getInventory():AddItem("ORGM."..ammoType);
+					local gun = player:getInventory():AddItem("Base.Pistol");
+					local mag
+					for i=1, 4 do
+						mag = player:getInventory():AddItem(gun:getMagazineType());
+						mag:setCurrentAmmoCount(15)
+					end
+									
+					player:getInventory():AddItem("Base.Bullets9mmBox");
+					player:getInventory():AddItem("Base.Bullets9mmBox");
+					player:getInventory():AddItem("Base.Bullets9mmBox");
+					player:getInventory():AddItem("Base.Bullets9mmBox");
+					
+					--gun:setClip(mag)
+					if(isModEnabled("Silencer")) then
+						gun:setCanon(instanceItem("Silencer.Silencer"))
+					end
+					
+					if(wife) then
+						local pistol = wife:Get():getInventory():AddItem("Base.HuntingRifle");
+						wife:Get():getInventory():AddItem("Base.308Clip");
+						
+						if(isModEnabled("Silencer")) then
+							pistol:setCanon(instanceItem("Silencer.Silencer"))
 						end
+						wife:Get():setPrimaryHandItem(pistol)
+						wife:Get():setSecondaryHandItem(pistol)
 						
-					end
-					
-				else
-					
-					player:getInventory():AddItem("Base.Pistol");
-					player:getInventory():AddItem("Base.BulletsBox");
-					player:getInventory():AddItem("Base.BulletsBox");
-					player:getInventory():AddItem("Base.BulletsBox");
-					player:getInventory():AddItem("Base.BulletsBox");
-					
-					if(wife) and (wife:hasGun() == false) then
-						wife:giveWeapon("Base.Pistol")
 						for i=1, 12 do
-							wife:Get():getInventory():AddItem("Base.Bullets9mm");
+							wife:Get():getInventory():AddItem("Base.308Bullets");
 						end					
 					end
+						
 					
-				end
+					
+					for i=1, 8 do player:LevelPerk(Perks.FromString("Aiming")) end
+					for i=1, 8 do player:LevelPerk(Perks.FromString("Reloading")) end
+					
+					if(wife) then 
+						for i=1, 8 do wife:Get():LevelPerk(Perks.FromString("Aiming")) end
+					end
+					
+					player:getModData().LockNLoad = true
+					
+				end						
 				
-				for i=1, 8 do player:LevelPerk(Perks.FromString("Aiming")) end
-				for i=1, 8 do player:LevelPerk(Perks.FromString("Reloading")) end
-				
-				if(wife) then 
-					for i=1, 8 do wife:Get():LevelPerk(Perks.FromString("Aiming")) end
-				end
-				
-				player:getModData().LockNLoad = true
-				
-			end						
-			
-			local mydesc = getSpecificPlayer(0):getDescriptor()
-			if(SSM:Get(0)) then SSM:Get(0):setName(mydesc:getForename()) end
+				local mydesc = getSpecificPlayer(0):getDescriptor()
+				if(SSM:Get(0)) then SSM:Get(0):setName(mydesc:getForename()) end
+			else	
+				print("finished initing player index " .. tostring(player:getPlayerNum()) )
+			end
+end
+
+
+function SuperSurvivorOnDeath(player)
+		
+	if(player and player:getModData().ID ~= nil) then
+		
+		local SS = SSM:Get(player:getModData().ID)
+		if(SS ~= nil) then SS:OnDeath() end
+	end
 	
+end
+function SuperSurvivorGlobalUpdate(player)
+		
+	if(player and player:getModData().ID ~= nil) then
+		
+		local SS = SSM:Get(player:getModData().ID)
+		if(SS ~= nil) then SS:PlayerUpdate() end
 	end
 	
 end
@@ -258,23 +178,33 @@ end
 
 function getGunShotWoundBP(player)
 
+	if(not instanceof(player,"IsoPlayer")) then 
+		print("not a player object was given to getGunshotwoundBP")
+		return nil 
+	end
+
 	local BD = player:getBodyDamage()
 	local bps = BD:getBodyParts() ;
 	local foundBP = false
 	local list = {};
 	if(bps) then
 		for i=1, bps:size()-1 do		
-			if(bps:get(i) ~= nil) and ( bps:get(i):haveBullet() ) and ( bps:get(i):getHealth() > 0)  then
+			if(bps:get(i) ~= nil) and ( bps:get(i):HasInjury() ) and ( bps:get(i):getHealth() > 0)  then
 				table.insert(list,i);
 				foundBP = true
 			end
 		end
 	end
-	if(not foundBP) then return nil end
+	if(not foundBP) then 
+		print("no body part with gunshot wound")
+		return nil 
+	end
 	local result = ZombRand(1,#list)
 	local index = list[result]
 	local outBP = bps:get(index)
+	print("body part found was: " .. tostring(outBP))
 	return outBP
+	
 end
 
 
@@ -283,6 +213,8 @@ function SuperSurvivorPVPHandle(wielder, victim, weapon, damage)
 	local SSW = SSM:Get(wielder:getModData().ID)
 	local SSV = SSM:Get(victim:getModData().ID)
 	local fakehit = false
+	
+	if(SSV == nil) or (SSW == nil) then return false end
 	
 	if(victim.setAvoidDamage ~= nil) then
 		if(SSW:isInGroup(victim)) then  
@@ -302,7 +234,7 @@ function SuperSurvivorPVPHandle(wielder, victim, weapon, damage)
 	if fakehit then return false end
 	
 
-	--- obj cover calculations
+	--[[ obj cover calculations
 	if(instanceof(weapon,"HandWeapon")) and (weapon:isAimedFirearm()) and (instanceof(victim,"IsoPlayer")) then
 		
 		local angle = wielder:getAngle()
@@ -345,6 +277,7 @@ function SuperSurvivorPVPHandle(wielder, victim, weapon, damage)
 		
 		end
 	end
+	]]
 	
 	--- obj cover calculations	END
 	
@@ -359,24 +292,27 @@ function SuperSurvivorPVPHandle(wielder, victim, weapon, damage)
 			--if(victim ~= getSpecificPlayer(0)) then wielder:Say(tostring(LastGuyHitCount)) end
 	
 		--	local extraDamage = ZombRand(150,250);
+			--print("here i am31")
+			local extraDamage ;
 			local shotPartshotPart = getGunShotWoundBP(victim)
-			if(shotPartshotPart) then
+			if(shotPartshotPart ~= nil) and (SSV:getID() ~= 0) then
 				--if( shotPartshotPart:getType() == "Head") then extraDamage = 40 
 				--elseif( shotPartshotPart:getType() == "Neck") then extraDamage = 30
 				--elseif( shotPartshotPart:getType() == "Torso_Lower") then extraDamage = 30
 				--elseif( shotPartshotPart:getType() == "Torso_Upper") then extraDamage = 35
 				--end
-				extraDamage = (damage*12)
+				extraDamage = 100 --(damage*24)
 				--print("added " .. tostring(extraDamage) .. " damage to gun shot wound on " .. tostring(shotPartshotPart:getType()) .. " to player number " .. tostring(victim:getModData().ID))
-				--print("pre getHealth is " .. tostring(shotPartshotPart:getHealth()))
+			--	print("pre getHealth is " .. tostring(shotPartshotPart:getHealth()))
 				--print("pre getHealth is " .. tostring(victim:getBodyDamage():getHealth()))
 				
 				shotPartshotPart:AddDamage(extraDamage);
+				shotPartshotPart:DamageUpdate();
 				--victim:getBodyDamage():DamageFromWeapon(weapon);
 				victim:update();
 				
-				--print("post getHealth is " .. tostring(shotPartshotPart:getHealth()) ) 
-				--print("post getHealth is " .. tostring(victim:getBodyDamage():getHealth()) ) 
+				print("post getHealth is " .. tostring(shotPartshotPart:getHealth()) ) 
+				print("post getHealth is " .. tostring(victim:getBodyDamage():getHealth()) ) 
 				
 			end
 	
@@ -392,10 +328,35 @@ function SuperSurvivorPVPHandle(wielder, victim, weapon, damage)
 			victim:getModData().hitByCharacter = true
 		end
 	end
-	if(instanceof(victim, "IsoPlayer") and victim:getModData().isHostile ~= true ) then		
+	if(instanceof(victim, "IsoPlayer") ) then	
+
+		if(weapon~=nil) and (not weapon:isAimedFirearm()) and (weapon:getPushBackMod() > 0.3) then
+			victim:StopAllActionQueue()
+			local dot = victim:getDotWithForwardDirection(wielder:getX(),wielder:getY());
+			print("dot="..tostring(dot))
+			if(dot < 0) then 				
+				ISTimedActionQueue.add(ISGetHitFromBehindAction:new(victim,wielder))
+			elseif(dot > 0) then 
+				ISTimedActionQueue.add(ISGetHitFromFrontAction:new(victim,wielder)) 
+			end
+		
+		end
+	
 		wielder:getModData().semiHostile = true		
+		if(victim:getModData().surender) and weapon and weapon:isRanged() then -- defenceless player hit, they die
+				victim:getBodyDamage():getBodyPart(BodyPartType.Head):AddDamage(500);
+				victim:getBodyDamage():getBodyPart(BodyPartType.Torso_Upper):AddDamage(500);
+				victim:getBodyDamage():getBodyPart(BodyPartType.Hand_L):AddDamage(500);
+				victim:getBodyDamage():getBodyPart(BodyPartType.UpperLeg_R):AddDamage(500);
+				victim:getBodyDamage():Update();
+				
+				SSM:PublicExecution(SSW,SSV)
+		end
 	end
+	
+	
 	
 end
 Events.OnWeaponHitCharacter.Add(SuperSurvivorPVPHandle);
 Events.OnPlayerUpdate.Add(SuperSurvivorGlobalUpdate);
+Events.OnCharacterDeath.Add(SuperSurvivorOnDeath);

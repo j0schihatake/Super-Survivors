@@ -45,11 +45,13 @@ function ChopWoodTask:update()
 		end
 		
 		local wep = player:getPrimaryHandItem()
-		if(wep == nil) or ( (wep ~= nil) and (wep:getType() ~= "Axe") and (wep:getType() ~= "AxeStone") ) then 
+		if(wep == nil) or ( (wep ~= nil) and (wep:getType() ~= "Axe") and (wep:getType() ~= "WoodAxe") and (wep:getType() ~= "AxeStone") ) then 
 			self.Axe = self.parent:getBag():getItemFromType("Axe");
 			if(self.Axe == nil) then self.Axe = self.parent:getBag():getItemFromType("AxeStone") end
+			if(self.Axe == nil) then self.Axe = self.parent:getBag():getItemFromType("WoodAxe") end
 			if(self.Axe == nil) then self.Axe = self.parent:Get():getInventory():getItemFromType("Axe") end
 			if(self.Axe == nil) then self.Axe = self.parent:Get():getInventory():getItemFromType("AxeStone") end
+			if(self.Axe == nil) then self.Axe = self.parent:Get():getInventory():getItemFromType("WoodAxe") end
 			if(self.Axe ~= nil) and (player:getPrimaryHandItem() ~= self.Axe) then 
 				player:setPrimaryHandItem(self.Axe) 
 			end			
@@ -89,7 +91,7 @@ function ChopWoodTask:update()
 				local gamehours = getGameTime():getWorldAgeHours();
 				for x=minx, maxx do
 					for y=miny, maxy do
-						Square = getCell():getOrCreateGridSquare(x,y,0);
+						Square = getCell():getGridSquare(x,y,0);
 						if(Square ~= nil) then
 							local distance = getDistanceBetween(Square,player);
 							local closeobjects = Square:getObjects();
@@ -128,6 +130,7 @@ function ChopWoodTask:update()
 				self.axetoget = true
 				
 				self.parent:getTaskManager():AddToTop(FindThisTask:new(self.parent,"Axe","Type"))
+				
 			end
 			
 		end

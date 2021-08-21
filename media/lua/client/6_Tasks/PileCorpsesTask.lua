@@ -50,6 +50,8 @@ function PileCorpsesTask:update()
 					
 					--self.BringHereSquare:AddWorldInventoryItem(Corpse,(ZombRand(10)/100),(ZombRand(10)/100),0)
 					--self.parent.player:getInventory():DoRemoveItem(Corpse) 
+					self.parent:StopWalk()
+					--print(self:getName().."stopping walking4")
 					ISTimedActionQueue.add(ISDropItemAction:new(self.parent:Get(),Corpse,30))
 					self.parent:Get():setPrimaryHandItem(nil)
 					self.parent:Get():setSecondaryHandItem(nil)
@@ -112,7 +114,7 @@ function PileCorpsesTask:update()
 					self.parent:walkTo(self.TargetSquare);
 				elseif self.TargetSquare:getDeadBody() then
 					
-					
+					--print(getText("ContextMenu_SD_PickUpCorpse"));
 					ISTimedActionQueue.add(ISGrabCorpseAction:new(self.parent:Get(),self.TargetSquare:getDeadBody(),30))
 					
 					

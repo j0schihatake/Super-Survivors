@@ -26,6 +26,24 @@ Orders = {
 
 };
 
+function getPresetColor(Color)
+
+	if Color == "White" then return ImmutableColor.new(0.75,0.74,0.72)
+	elseif Color == "Grey" then return mmutableColor.new(0.48,0.47,0.44)
+	elseif Color == "Blond" then return ImmutableColor.new(0.82,0.82,0.39)
+	elseif Color == "Sand" then return ImmutableColor.new(0.86,0.78,0.66)
+	elseif Color == "Hazel" then return ImmutableColor.new(0.61,0.50,0.34)
+	elseif Color == "Brown" then return ImmutableColor.new(0.62,0.42,0.17)
+	elseif Color == "Red" then return ImmutableColor.new(0.58,0.25,0.25)
+	elseif Color == "Pink" then return ImmutableColor.new(0.59,0.39,0.55)
+	elseif Color == "Purple" then return ImmutableColor.new(0.47,0.43,0.59)
+	elseif Color == "Blue" then return ImmutableColor.new(0.39,0.47,0.59)
+	elseif Color == "Black" then return ImmutableColor.new(0.10,0.08,0.09)
+	else return ImmutableColor.new(0.99,0.99,0.99)
+	end
+	
+end
+
 function getCoordsFromID(id)
 
 	for k,v in pairs(SurvivorMap) do
@@ -52,18 +70,23 @@ function getAmmoBox(bullets)
 	if(isModEnabled("ORGM")) then return bullets.."_Box" end
 	
 	if(bullets == "223Bullets") then return "223Box" 
-	elseif(bullets == "Bullets9mm") then return "BulletsBox" 
+	elseif(bullets == "Bullets9mm") then return "Bullets9mmBox" 
 	elseif(bullets == "308Bullets") then return "308Box" 
 	elseif(bullets == "ShotgunShells") then return "ShotgunShellsBox" 
+	
+	elseif(bullets == "Bullets38") then return "Bullets38Box" 
+	elseif(bullets == "Bullets44") then return "Bullets44Box" 
+	elseif(bullets == "Bullets45") then return "Bullets45Box" 
 	end
 	
-
+	print("no ammo box found for bullets "..tostring(bullets))
+	return ""
 end
 
 function getBoxCount(box)
 
 	if(box == "223Box") then return 40 
-	elseif(box == "BulletsBox") then return 30
+	elseif(box == "Bullets9mmBox") then return 30
 	elseif(box == "308Box") then return 40 
 	elseif(box == "ShotgunShellsBox") then return 24 
 	elseif(isModEnabled("ORGM")) then return 50
@@ -90,14 +113,17 @@ SuperSurvivorsAmmoBoxes = {   -- for the loot stores that are spawned with prese
 SurvivorPerks = {
 "Aiming",
 "Axe",
-"BladeGuard",
-"BladeMaintenance",
+"Combat",
+"SmallBlade",
+"LongBlade",
+"SmallBlunt",
 "Blunt",
-"BluntGuard",
-"BluntMaintenance",
+"Maintenance",
+"Spear",
 "Doctor",
 "Farming",
 "Firearm",
+"Reloading",
 "Fitness",
 "Lightfoot",
 "Melee",
@@ -169,7 +195,7 @@ function getCenterSquareFromArea(x1,x2,y1,y2,z)
 	local xdiff = x2 - x1
 	local ydiff = y2 - y1
 	
-	local result = getCell():getOrCreateGridSquare(x1+math.floor(xdiff/2),y1+math.floor(ydiff/2),z)
+	local result = getCell():getGridSquare(x1+math.floor(xdiff/2),y1+math.floor(ydiff/2),z)
 	
 	return result
 	
@@ -186,7 +212,7 @@ function getRandomAreaSquare(area)
 		local xrand = ZombRand(x1,x2)
 		local yrand = ZombRand(y1,y2)
 		
-		local result = getCell():getOrCreateGridSquare(xrand,yrand,area[5])
+		local result = getCell():getGridSquare(xrand,yrand,area[5])
 		
 		return result
 	end
@@ -200,7 +226,7 @@ function getFleeSquare(fleeGuy,attackGuy)
 	else tempx = distance; end
 	if (tempy < 0) then tempy = -distance; 
 	else tempy = distance; end
-	return fleeGuy:getCell():getOrCreateGridSquare(fleeGuy:getX()+tempx+ZombRand(-5,5),fleeGuy:getY()+tempy+ZombRand(-5,5),fleeGuy:getZ());
+	return fleeGuy:getCell():getGridSquare(fleeGuy:getX()+tempx+ZombRand(-5,5),fleeGuy:getY()+tempy+ZombRand(-5,5),fleeGuy:getZ());
 end
 
 function getTowardsSquare(moveguy,x,y,z)
@@ -213,7 +239,7 @@ function getTowardsSquare(moveguy,x,y,z)
 	if (tempy > 0) and (tempy >= distance) then tempy = -distance; 
 	elseif (tempy < -distance) then tempy = distance; 
 	else tempy = -tempy end
-	return moveguy:getCell():getOrCreateGridSquare(moveguy:getX()+tempx+ZombRand(-2,2),moveguy:getY()+tempy+ZombRand(-2,2),moveguy:getZ());
+	return moveguy:getCell():getGridSquare(moveguy:getX()+tempx+ZombRand(-2,2),moveguy:getY()+tempy+ZombRand(-2,2),moveguy:getZ());
 end
 
 function SurvivorTogglePVP()
@@ -241,10 +267,28 @@ end
 
 function getAmmoType(weapon,incModule)
 	
-	if(weapon == nil) then return nil end
+	if(weapon == nil) or (weapon.getAmmoType == nil) then return nil end
 	local out = '';
-	local modulename =''; 
-	local wepdata = ReloadUtil:getWeaponData(weapon:getType());
+	local modulename ='Base'; 
+	local wepType = weapon:getType();
+	
+	out = weapon:getAmmoType()
+	
+	if(out == nil) then
+		local s = weapon:getMagazineType();
+		i, j = string.find(s, "Clip")
+		out = s:sub( i )
+	end
+	
+	if(out == nil) then 
+		print("no bullets found for weapon: " .. wepType)
+		return nil 
+	end
+	
+	out = out:sub( 6 )
+	--[[
+	print("weapong type: "..wepType);
+	local wepdata = ReloadUtil:getWeaponData(wepType);
 	if(not wepdata or not wepdata.ammoType) then 
 		--if(wepdata) then print("no weapon data for:"..tostring(weapon:getType()) .. "["..tostring(wepdata.ammoType).."]");
 		--else print("no weapon data for:"..tostring(weapon:getType())); end
@@ -269,13 +313,18 @@ function getAmmoType(weapon,incModule)
 	else
 		--print("else?"); 
 	end
+	--]]
 	
-	if(incModule) then out = modulename .. "." .. out; end
+	
+	--if(incModule) then out = modulename .. "." .. out; end
 	return out;
 
 end
 
 function getAmmoBullets(weapon,incModule)
+	
+	if(weapon == nil) then return nil end
+	
 	if (instanceof(weapon,"HandWeapon")) and (weapon:isAimedFirearm()) then
 		local bullets = {}
 
@@ -291,7 +340,7 @@ function getAmmoBullets(weapon,incModule)
 		  return bullets
 		end
 		
-		if(weapon == nil) then return nil end
+		
 		
 		if(incModule) then 
 			table.insert(bullets,getAmmoType(weapon,incModule))
@@ -442,7 +491,7 @@ function getDoor(building,character)
 	for x=bdef:getX()-1,(bdef:getX() + bdef:getW() + 1) do	
 		for y=bdef:getY()-1,(bdef:getY() + bdef:getH() + 1) do
 			
-			local sq = getCell():getOrCreateGridSquare(x,y,character:getZ())			
+			local sq = getCell():getGridSquare(x,y,character:getZ())			
 			if(sq) then 
 				local Objs = sq:getObjects();
 				for j=0, Objs:size()-1 do
@@ -473,7 +522,7 @@ function getUnlockedDoor(building,character)
 	for x=bdef:getX()-1,(bdef:getX() + bdef:getW() + 1) do	
 		for y=bdef:getY()-1,(bdef:getY() + bdef:getH() + 1) do
 			
-			local sq = getCell():getOrCreateGridSquare(x,y,character:getZ())			
+			local sq = getCell():getGridSquare(x,y,character:getZ())			
 			if(sq) then 
 				local Objs = sq:getObjects();
 				for j=0, Objs:size()-1 do
@@ -504,7 +553,7 @@ function NumberOfZombiesInOrAroundBuilding(building)
 	for x=(bdef:getX() - padding),(bdef:getX() + bdef:getW() + padding) do	
 		for y=(bdef:getY() - padding),(bdef:getY() + bdef:getH() + padding) do
 			
-			local sq = getCell():getOrCreateGridSquare(x,y,0)			
+			local sq = getCell():getGridSquare(x,y,0)			
 			if(sq) then 
 				local Objs = sq:getMovingObjects();
 				for j=0, Objs:size()-1 do
@@ -527,7 +576,7 @@ function getOutsideSquare(square,building)
 	
 	if(not building) or (not square) then return nil end
 	
-	local windowsquare = getCell():getOrCreateGridSquare(square:getX(),square:getY(),square:getZ());
+	local windowsquare = getCell():getGridSquare(square:getX(),square:getY(),square:getZ());
 	if windowsquare~= nil and windowsquare:isOutside() then return windowsquare end
 	
 	local N = GetAdjSquare(square,"N")
@@ -554,7 +603,7 @@ function getCloseWindow(building,character)
 	for x=bdef:getX()-1,(bdef:getX() + bdef:getW() + 1) do	
 		for y=bdef:getY()-1,(bdef:getY() + bdef:getH() + 1) do
 			
-			local sq = getCell():getOrCreateGridSquare(x,y,character:getZ())			
+			local sq = getCell():getGridSquare(x,y,character:getZ())			
 			if(sq) then 
 				local Objs = sq:getObjects();
 				for j=0, Objs:size()-1 do
@@ -582,7 +631,7 @@ function getRandomBuildingSquare(building)
 	local x = ZombRand(bdef:getX(), (bdef:getX() + bdef:getW()))
 	local y = ZombRand(bdef:getY(), (bdef:getY() + bdef:getH()))
 	
-	local sq = getCell():getOrCreateGridSquare(x,y,0)			
+	local sq = getCell():getGridSquare(x,y,0)			
 	if(sq) then 
 		return sq
 	end
@@ -601,7 +650,7 @@ function getRandomFreeBuildingSquare(building)
 		local x = ZombRand(bdef:getX(), (bdef:getX() + bdef:getW()))
 		local y = ZombRand(bdef:getY(), (bdef:getY() + bdef:getH()))
 		
-		local sq = getCell():getOrCreateGridSquare(x,y,0)			
+		local sq = getCell():getGridSquare(x,y,0)			
 		if(sq) and sq:isFree(false) and (sq:getRoom() ~= nil) and (sq:getRoom():getBuilding() == building) then 
 			return sq
 		end
@@ -622,13 +671,13 @@ end
 function GetAdjSquare(square,dir)
 
 	if(dir == 'N') then
-		return getCell():getOrCreateGridSquare(square:getX(),square:getY() - 1,square:getZ());
+		return getCell():getGridSquare(square:getX(),square:getY() - 1,square:getZ());
 	elseif(dir == 'E') then
-		return getCell():getOrCreateGridSquare(square:getX() + 1,square:getY(),square:getZ());
+		return getCell():getGridSquare(square:getX() + 1,square:getY(),square:getZ());
 	elseif(dir == 'S') then
-		return getCell():getOrCreateGridSquare(square:getX(),square:getY() + 1,square:getZ());
+		return getCell():getGridSquare(square:getX(),square:getY() + 1,square:getZ());
 	else
-		return getCell():getOrCreateGridSquare(square:getX() - 1,square:getY(),square:getZ());
+		return getCell():getGridSquare(square:getX() - 1,square:getY(),square:getZ());
 	end
 end
 
@@ -688,7 +737,7 @@ end
 
 function doesFileExist( fileName )
 	local fileTable = {}
-	local readFile = getModFileReader("SuperSurvivors",getWorld():getWorld()..getFileSeparator()..fileName, false)
+	local readFile = getModFileReader("SuperbSurvivors",getWorld():getWorld()..getFileSeparator()..fileName, false)
 	
 	if(readFile) then return true
 	else return false end
@@ -696,7 +745,7 @@ end
 
 function table.load( fileName )
 	local fileTable = {}
-	local readFile = getModFileReader("SuperSurvivors",getWorld():getWorld()..getFileSeparator()..fileName..".lua", true)
+	local readFile = getModFileReader("SuperbSurvivors",getWorld():getWorld()..getFileSeparator()..fileName..".lua", true)
 	if(readFile) then
 		local scanLine = readFile:readLine()
 		while scanLine do
@@ -722,13 +771,61 @@ function table.save(  tbl,fileName )
 
 	local destFile = getWorld():getWorld()..getFileSeparator()..fileName..".lua"
 	--print("table.saving:".. destFile)
-	local writeFile = getModFileWriter("SuperSurvivors", destFile, true, false)
+	local writeFile = getModFileWriter("SuperbSurvivors", destFile, true, false)
 	for i = 1,#tbl do
 		writeFile:write(tbl[i].."\r\n");
 		--print(tbl[i])
 	end
 	writeFile:close();
 end
+
+
+
+
+
+function kvtableload( fileName )
+	
+	local fileTable = {}
+	local readFile = getModFileReader("SuperbSurvivors",getWorld():getWorld()..getFileSeparator()..fileName , true)
+	
+	if( not readFile ) then return {} end
+	
+	local scanLine = readFile:readLine()
+	while scanLine do
+	
+		local values = {}
+		for input in scanLine:gmatch("%S+") do table.insert(values,input) end
+		print(fileName..": loading line: "..values[1] .. " " .. values[2])
+		
+		fileTable[values[1]] = values[2];
+		
+		scanLine = readFile:readLine()
+		if not scanLine then break end
+	end
+	readFile:close()
+	return fileTable
+end
+
+
+function kvtablesave( fileTable, fileName )
+	
+
+	if(not fileTable) then return false end
+	
+	local destFile = getWorld():getWorld()..getFileSeparator()..fileName
+	local writeFile = getModFileWriter("SuperbSurvivors", destFile, true, false)
+	--print("saving fileTable:".. tostring(fileTable))
+	for index,value in pairs(fileTable) do
+				
+		writeFile:write(tostring(index) .. " " .. tostring(value) .. "\r\n");
+		--print("saving: " .. tostring(index) .. " " .. tostring(value[i]))		
+	end
+	writeFile:close();
+	
+	
+end
+
+
 
 function getSaveDir()
 	return Core.getMyDocumentFolder()..getFileSeparator().."Saves"..getFileSeparator().. getWorld():getGameMode() .. getFileSeparator() .. getWorld():getWorld().. getFileSeparator();
@@ -825,3 +922,105 @@ function isItemWater(item)
 end
 
 
+
+
+if not SurvivorRandomSuits then 
+	SurvivorRandomSuits = {} 
+	SurvivorRandomSuits["Common"] = {} -- 75%
+	SurvivorRandomSuits["Normal"] = {}  -- 20%
+	SurvivorRandomSuits["Rare"] = {}	-- 5%
+end
+
+SurvivorRandomSuits["Rare"]["Army1"] = {"Base.Hat_BeretArmy", "Base.Jacket_CoatArmy", "Base.Trousers_ArmyService", "Base.Shoes_ArmyBoots"}
+SurvivorRandomSuits["Rare"]["Bride1"] = {"Base.WeddingDress", "Base.Shirt_FormalWhite", "Base.Socks_Long", "Base.Shoes_Black"}
+SurvivorRandomSuits["Rare"]["Groom1"] = {"Base.Tie_BowTieFull", "Base.Gloves_WhiteTINT", "Base.WeddingJacket", "Base.Shirt_FormalWhite", "Base.Trousers_Suit", "Base.Socks_Long", "Shoes_Black"}
+SurvivorRandomSuits["Rare"]["Priest1"] = {"Base.Shirt_Priest", "Base.Trousers_Suit", "Base.Socks_Ankle", "Base.Shoes_Black"}
+SurvivorRandomSuits["Rare"]["ShopSpiffo1"] = {"Base.Tshirt_BusinessSpiffo", "Base.Apron_Spiffos", "Base.TrousersMesh_DenimLight", "Base.Socks_Ankle", "Base.Shoes_TrainerTINT"}
+SurvivorRandomSuits["Rare"]["SwimwearF1"] = {"Base.Bikini_Pattern01"}
+SurvivorRandomSuits["Rare"]["SwimwearM1"] = {"Base.SwimTrunks_Blue"}
+SurvivorRandomSuits["Rare"]["Nurse1"] = {"Base.Hat_SurgicalMask_Blue", "Base.Tshirt_Scrubs", "Base.Trousers_Scrubs", "Base.Socks_Ankle", "Base.Shoes_Black"}
+SurvivorRandomSuits["Rare"]["Prepper1"] = {"Base.Hat_GasMask", "Base.HoodieUP_GreenTINT", "Base.Vest_BulletCivilian", "Base.TrousersMesh_DenimLight", "Base.Socks_Ankle", "Base.Shoes_Black"}
+
+SurvivorRandomSuits["Normal"]["Hunter1"] = {"Base.Hat_BonnieHat_CamoGreen", "Base.Vest_Hunting_Camo", "Base.Trousers_CamoGreen", "Base.Shoes_BlackBoots"}
+SurvivorRandomSuits["Normal"]["ShopGeneric1"] = {"Base.Tshirt_DefaultDECAL", "Base.Apron_Black", "Base.TrousersMesh_DenimLight", "Base.Socks_Ankle", "Base.Shoes_TrainerTINT"}
+SurvivorRandomSuits["Normal"]["Athlete1"] = {"Base.Shorts_ShortSport", "Base.Tshirt_Sport", "Base.Socks_Ankle", "Base.Shoes_TrainerTINT"}
+SurvivorRandomSuits["Normal"]["Student1"] = {"Base.Tshirt_DefaultDECAL", "Base.TrousersMesh_DenimLight", "Base.Socks_Ankle", "Base.Shoes_TrainerTINT", "Base.Jacket_Varsity"}
+SurvivorRandomSuits["Normal"]["OfficeM1"] = {"Base.Tie_Full", "Base.Shirt_FormalWhite", "Base.Trousers_Suit", "Base.Socks_Ankle", "Base.Shoes_Black"}
+SurvivorRandomSuits["Normal"]["OfficeF1"] = {"Base.Shirt_FormalWhite", "Base.Skirt_Normal", "Base.Socks_Long", "Base.Shoes_Black"}
+SurvivorRandomSuits["Normal"]["Biker1"] = {"Base.Hat_Bandana", "Base.Glasses_Aviators", "Base.Jacket_Black", "Base.Tshirt_Rock", "Base.TrousersMesh_DenimLight", "Base.Socks_Ankle", "Base.Shoes_Black"}
+
+--SurvivorRandomSuits["Common"]["Dress01"] = {"Base.Dress_Normal", "Base.Socks_Ankle", "Base.Shoes_Black"}
+--SurvivorRandomSuits["Common"]["Dress02"] = {"Base.Hat_Beret", "Base.Dress_ Knees", "Base.Socks_Long", "Base.Shoes_Black"}
+--SurvivorRandomSuits["Common"]["Dress03"] = {"Base.Dress_Long", "Base.Socks_Long", "Base.Shoes_Black"}
+--SurvivorRandomSuits["Common"]["Skirt01"] = {"Base.Skirt_Normal", "Base.Tshirt_DefaultTEXTURE", "Base.Socks_Long", "Base.Shoes_Black"}
+--SurvivorRandomSuits["Common"]["Skirt02"] = {"Base.Skirt_Knees", "Base.Tshirt_DefaultTEXTURE", "Base.Socks_Long", "Base.Shoes_Black", "Base.Hat_Beret"}
+--SurvivorRandomSuits["Common"]["Skirt03"] = {"Base.Skirt_Long", "Base.Tshirt_DefaultTEXTURE", "Base.Socks_Long", "Base.Shoes_Black"}
+SurvivorRandomSuits["Common"]["Generic01"] = {"Base.HoodieDOWN_GreyTINT", "Base.Tshirt_Rock", "Base.TrousersMesh_DenimLight", "Base.Socks_Ankle", "Base.Shoes_TrainerTINT"}
+SurvivorRandomSuits["Common"]["Generic02"] = {"Base.Tshirt_DefaultDECAL", "Base.Jumper_DiamondPatternTINT", "Base.Glasses_Normal", "Base.TrousersMesh_DenimLight", "Base.Socks_Ankle", "Base.Shoes_TrainerTINT"}
+SurvivorRandomSuits["Common"]["Generic03"] = {"Base.Jumper_RoundNeck", "Base.Tshirt_Rock", "Base.TrousersMesh_DenimLight", "Base.Socks_Ankle", "Base.Shoes_TrainerTINT"}
+SurvivorRandomSuits["Common"]["Generic04"] = {"Base.Tshirt_DefaultDECAL", "Base.TrousersMesh_DenimLight", "Base.Socks_Ankle", "Base.Shoes_TrainerTINT"}
+SurvivorRandomSuits["Common"]["Basic1"] = {"Base.Hat_BaseballCapBlue", "Base.Shirt_HawaiianRed", "Base.TrousersMesh_DenimLight", "Base.Shoes_Black"}
+
+SurvivorRandomSuits["Rare"]["Bandit1"] = {"Base.Hat_BalaclavaFull", "Base.Jacket_Padded", "Base.TrousersMesh_DenimLight", "Base.Tshirt_Rock", "Base.Socks_Ankle", "Base.Shoes_Black"}
+SurvivorRandomSuits["Rare"]["Bandit2"] = {"Base.Hat_BalaclavaFull", "Base.HoodieUP_WhiteTINT", "Base.TrousersMesh_DenimLight", "Tshirt_DefaultDECAL", "Base.Socks_Ankle", "Base.Shoes_Black"}
+SurvivorRandomSuits["Rare"]["Bandit3"] = {"Base.Hat_BalaclavaFull", "Base.Vest_Hunting_Camo", "Base.Trousers_CamoGreen", "Base.Shoes_BlackBoots"}
+
+SurvivorRandomSuits["Rare"]["Prisoner1"] = {"Base.Boilersuit_Prisoner", "Base.Shoes_Black"}
+
+SurvivorRandomSuits["Normal"]["Worker1"] = {"Base.Shirt_Workman", "Base.Vest_HighViz", "Base.TrousersMesh_DenimLight", "Base.Socks_Ankle", "Base.Shoes_Black"}
+SurvivorRandomSuits["Normal"]["Student1"] = {"Base.Shorts_ShortSport", "Base.Tshirt_Sport", "Base.Socks_Ankle", "Base.Shoes_TrainerTINT"}
+
+function table.randFrom( t )
+   local keys = {}
+    for key, value in pairs(t) do
+        keys[#keys+1] = key --Store keys in another table
+    end
+	local key = ZombRand(1, #keys)
+    index = keys[key]
+	--return t[index]
+	return index
+end
+function getRandomSurvivorSuit(SS)
+
+	local roll = ZombRand(1,100)
+	local tempTable = nil
+	
+	if(roll <= 5) then -- choose rare suit
+		print("Rare suit:")
+		tempTable = SurvivorRandomSuits["Rare"]
+	elseif(roll <= 25) then --  chose normal suit
+		print("Normal suit:")
+		tempTable = SurvivorRandomSuits["Normal"]
+	else --chose common suit
+		print("Common suit:")
+		tempTable = SurvivorRandomSuits["Common"]
+	end
+	
+	
+	print(tostring(size(tempTable)).." total suits in category.")
+	local result = table.randFrom(tempTable)
+	print("random key result is: "..tostring(result))
+	
+	local suitTable = tempTable[result]
+	for i=1,#suitTable do
+		if(suitTable[i] ~= nil) then
+			print("WearThis: " .. tostring(suitTable[i]))
+			SS:WearThis(suitTable[i])
+		end
+	end
+
+end
+
+function setRandomSurvivorSuit(SS,tbl,name)
+
+	local suitTable = SurvivorRandomSuits[tbl][name]
+	if suitTable then
+		for i=1,#suitTable do
+			if(suitTable[i] ~= nil) then
+				print("WearThis: " .. tostring(suitTable[i]))
+				SS:WearThis(suitTable[i])
+			end
+		end
+	end
+
+end

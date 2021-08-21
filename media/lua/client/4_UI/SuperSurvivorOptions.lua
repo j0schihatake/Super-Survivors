@@ -28,6 +28,8 @@ function SuperSurvivorGetOptionValue(option)
 	elseif(option == "MaxHostileSpawnRate") then return (num * 5) - 5
 	elseif(option == "InfinitAmmo") then return (num ~= 1)
 	elseif(option == "NoPreSetSpawn") then return (num ~= 1)
+	elseif(option == "SafeBase") then return (num ~= 1)
+	elseif(option == "DebugOptions") then return (num ~= 1)
 	elseif(option == "FindWork") then return (num == 1)
 	elseif(option == "SurvivorHunger") then return (num == 1)
 	elseif(option == "SurvivorFriendliness") then return (10 - ((num-1)*2)) -- 1 = 10, 2 = 8, 3 = 6
@@ -57,7 +59,7 @@ end
 
  function SaveSurvivorOptions()
 	local destFile = "SurvivorOptions.lua"
-	local writeFile = getModFileWriter("SuperSurvivors", destFile, true, false)
+	local writeFile = getModFileWriter("SuperbSurvivors", destFile, true, false)
 
 	for index,value in pairs(SuperSurvivorOptions) do
 	
@@ -75,7 +77,7 @@ function LoadSurvivorOptions( )
 	end
 
 	local fileTable = {}
-	local readFile = getModFileReader("SuperSurvivors","SurvivorOptions.lua", true)
+	local readFile = getModFileReader("SuperbSurvivors","SurvivorOptions.lua", true)
 	local scanLine = readFile:readLine()
 	while scanLine do
 	
@@ -94,7 +96,7 @@ end
 
 function doesOptionsFileExist(  )
 	local fileTable = {}
-	local readFile = getModFileReader("SuperSurvivors","SurvivorOptions.lua", false)
+	local readFile = getModFileReader("SuperbSurvivors","SurvivorOptions.lua", false)
 	
 	if(readFile) then return true
 	else return false end
@@ -323,6 +325,8 @@ if index then
 			print("option changed to ".. tostring(box.selected))
 		end
 		self.gameOptions:add(gameOption)
+		
+		
 		
 		
 		y = y + spacing
@@ -781,6 +785,61 @@ if index then
 		end
 		self.gameOptions:add(gameOption)
 		
+		
+		y = y + spacing
+		
+		
+		
+		local options = {getText("ContextMenu_SD_Off"),getText("ContextMenu_SD_On")}
+		local SafeBaseOptionsCombo = self:addCombo(splitpoint, y, comboWidth, 20,"Safe Base", options, 1)
+		SafeBaseOptionsCombo:setToolTipMap({defaultTooltip = "Wild Survivors will avoid your marked base"});
+		
+		gameOption = GameOption:new('SafeBase', SafeBaseOptionsCombo)
+		function gameOption.toUI(self)
+			local box = self.control
+			box.selected = SuperSurvivorGetOption("SafeBase")
+		end
+		function gameOption.apply(self)
+			local box = self.control
+			if box.options[box.selected] then
+				SuperSurvivorSetOption("SafeBase",box.selected)
+				print("setting survivor option")
+			else
+				print("error could not set survivor option")
+			end
+		end
+		function gameOption:onChange(box)
+			print("option changed to ".. tostring(box.selected))
+		end
+		self.gameOptions:add(gameOption)
+		
+		
+		y = y + spacing
+		
+		
+		
+		local options = {getText("ContextMenu_SD_Off"),getText("ContextMenu_SD_On")}
+		local DebugOptionsCombo = self:addCombo(splitpoint, y, comboWidth, 20,"Debug Options", options, 1)
+		DebugOptionsCombo:setToolTipMap({defaultTooltip = "Turns on debug right click survivor options"});
+		
+		gameOption = GameOption:new('DebugOptions', DebugOptionsCombo)
+		function gameOption.toUI(self)
+			local box = self.control
+			box.selected = SuperSurvivorGetOption("DebugOptions")
+		end
+		function gameOption.apply(self)
+			local box = self.control
+			if box.options[box.selected] then
+				SuperSurvivorSetOption("DebugOptions",box.selected)
+				print("setting survivor option")
+			else
+				print("error could not set survivor option")
+			end
+		end
+		function gameOption:onChange(box)
+			print("option changed to ".. tostring(box.selected))
+		end
+		self.gameOptions:add(gameOption)
 		
 		------hot keys-------
 		

@@ -18,7 +18,8 @@ end
 
 function FleeTask:isComplete()
 	if (self.parent:getDangerSeenCount() == 0) or self.parent:needToFollow() then 
-		StopWalk(self.parent.player)
+		self.parent:StopWalk()
+		--print(self:getName().."stopping walking7")
 		self.parent:setRunning(false)
 		return true	
 	else return false end
@@ -32,6 +33,7 @@ end
 function FleeTask:update()
 	
 	if(not self:isValid()) then return false end
+	self.parent:setSneaking(false)
 	
 	self.parent:walkTo(getFleeSquare(self.parent.player,self.parent.LastEnemeySeen))
 

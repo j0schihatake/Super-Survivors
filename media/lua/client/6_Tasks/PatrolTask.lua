@@ -9,13 +9,13 @@ function PatrolTask:new(superSurvivor, square1, square2)
 		
 	if(square1 ~= nil) then o.Square1 = square1
 	elseif(superSurvivor.player:getModData().PX ~= nil) then 
-	o.Square1 = getCell():getOrCreateGridSquare(superSurvivor.player:getModData().PX,superSurvivor.player:getModData().PY,superSurvivor.player:getModData().PZ)					
+	o.Square1 = getCell():getGridSquare(superSurvivor.player:getModData().PX,superSurvivor.player:getModData().PY,superSurvivor.player:getModData().PZ)					
 	else o.Square1 = superSurvivor.player:getCurrentSquare() end
 	if(o.Square1 == nil) then return nil end
 	
 	if(square2 ~= nil) then o.Square2 = square2
 	elseif(superSurvivor.player:getModData().P2X ~= nil) then 
-	o.Square2 = getCell():getOrCreateGridSquare(superSurvivor.player:getModData().P2X,superSurvivor.player:getModData().P2Y,superSurvivor.player:getModData().P2Z)				
+	o.Square2 = getCell():getGridSquare(superSurvivor.player:getModData().P2X,superSurvivor.player:getModData().P2Y,superSurvivor.player:getModData().P2Z)				
 	else return nil end	
 	if(o.Square2 == nil) then return nil end
 	

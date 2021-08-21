@@ -36,6 +36,7 @@ end
 
 function SuperSurvivorGroupManager:newGroup()
 
+	print("created new group with ID of " .. tostring(self.GroupCount))
 	self.Groups[self.GroupCount] = SuperSurvivorGroup:new(self.GroupCount)
 	self.GroupCount = self.GroupCount + 1
 	return self.Groups[self.GroupCount-1]
@@ -84,8 +85,12 @@ HillTopGroup:setGroupArea("CorpseStorageArea",11691,11691,7936,7936,0)
 HillTopGroup:setGroupArea("FoodStorageArea",11715,11715,7926,7926,0)
 HillTopGroup:setGroupArea("GuardArea",11707,11711,7938,7946,0)
 HillTopGroup:setGroupArea("ChopTreeArea",11679,11700,7951,7973,0)
+HillTopGroup:setGroupArea("FarmingArea",11741,11746,7939,7949,0)
 
 BlockadeGroup = SSGM:newGroup()  -- 1
+BlockadeGroup:setGroupArea("FarmingArea",12473,12475,4438,4476,0)
+BlockadeGroup:setGroupArea("ForageArea",12483,12484,4442,4443,0)
+
 BlockadeGroupID = BlockadeGroup:getID()
 WoodburyGroup = SSGM:newGroup()  -- 2 
 WoodburyGroupID = WoodburyGroup:getID()

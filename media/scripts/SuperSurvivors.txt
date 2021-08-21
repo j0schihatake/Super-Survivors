@@ -4,7 +4,57 @@ module Survivors
 	{
 		Base, farming
 	}
-
+	item Cigarettes
+	{
+		Count	=	20,
+		HungerChange	=	0,
+		Weight	=	0.005,
+		RequireInHandOrInventory	=	Lighter/Matches,
+		Type	=	Normal,
+		DisplayName	=	Cigarettes,
+		StressChange	=	-5,
+		Icon	=	IckySticks,
+		CustomContextMenu = Smoke,
+		CantBeFrozen = TRUE,
+		OnEat = OnEat_Cigarettes,
+		StaticModel = Cigarette,
+		EatType = Cigarettes,
+		CustomEatSound =
+	}
+	item Teabag2
+    {
+        Weight	=	0.1,
+        Type	=	Normal,
+        HungerChange    =   -5,
+        UnhappyChange   =   10,
+        ThirstChange    =   10,
+        FatigueChange	=	-15,
+        DisplayName	=	Tea Bag,
+        Icon	=	Teabag,
+        EvolvedRecipe   =   HotDrink:5,
+        FoodType    =   Tea,
+        EvolvedRecipeName = Tea,
+    }
+	 item Bleach
+	{
+		UnhappyChange	=	99,
+		Weight	=	1.6,
+		Type	=	Normal,
+		ThirstChange	=	-60,
+		DisplayName	=	Bleach,
+		Icon	=	Bleach,
+		Poison = true,
+		DisplayCategory = Item,
+		PoisonDetectionLevel = 7,
+	    PoisonPower = 40,
+	    UseForPoison = 15,
+		CustomContextMenu = Drink,
+		CustomEatSound = DrinkingFromBottle,
+		CantBeFrozen = TRUE,
+		ReplaceOnUse	=	BleachEmpty,
+		StaticModel = BleachBottle,
+		EatType = BleachBottle,
+	}
 
 	 item Grave
     {

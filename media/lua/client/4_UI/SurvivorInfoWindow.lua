@@ -136,6 +136,16 @@ function SurvivorInfoWindowCreate()
 	mySurvivorInfoWindow:setVisible(false);
 	mySurvivorInfoWindow.pin = true;
 	mySurvivorInfoWindow.resizable = true
+	
+	-- build compatibility check---
+	local player = getSpecificPlayer(0)
+	if(player.setSceneCulled == nil) then -- this function only exists in build 41
+		local text = "\n\n\nWARNING!! WARNING!! ERROR!!\n\nSUPERB SURVIVORS MOD INCOMPATIBLE WITH THIS BUILD! \n\n";
+		text = text .. "Please see the TIS forum or Discord to get help changng over to build 41."
+		mySurvivorInfoWindow:setVisible(true);
+		mySurvivorInfoWindow:setText(text);
+	end
+	
 end
 
 Events.OnGameStart.Add(SurvivorInfoWindowCreate);

@@ -31,6 +31,7 @@ end
 
 function LockDoorsTask:update()
 	
+	if(self.parent.DebugMode) then print(self:getName().."LockDoorsTask update") end
 	if(not self:isValid()) then return false end
 	
 	if(self.parent:isInAction() == false) then

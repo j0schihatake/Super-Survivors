@@ -24,7 +24,8 @@ end
 function TakeGiftTask:isComplete()
 	if(self.Complete) then
 		if(self.DestContainer:FindAndReturnCategory("Weapon") ~= nil) and (self.parent:Get():getPrimaryHandItem() == nil) then
-			self.parent:Get():setPrimaryHandItem(self.DestContainer:FindAndReturnCategory("Weapon"))
+			local weapon = self.DestContainer:FindAndReturnCategory("Weapon")
+			self.parent:giveWeapon(weapon,true)
 		end
 	end
 	return self.Complete
@@ -58,7 +59,7 @@ function TakeGiftTask:update()
 		end
 		local sq
 		if(x ~= nil) then 
-			sq = self.parent:Get():getCell():getOrCreateGridSquare(math.floor(x),math.floor(y),math.floor(z)) 
+			sq = self.parent:Get():getCell():getGridSquare(math.floor(x),math.floor(y),math.floor(z)) 
 		else 
 			self.Complete = true 
 			return false 
@@ -78,13 +79,23 @@ function TakeGiftTask:update()
 				self.Complete = true
 				
 				local itemType = self.TheGift:getType()
-				if (EquipAnyArmor ~= nil) and (GlobalArmor ~= nil) and (GlobalArmor[itemType] ~= nil)  then
+				
+				
+					
+				if  self.TheGift:getCategory()=="Container" then
 					self.parent:getBag():Remove(self.TheGift)
 					self.parent:Get():getInventory():AddItem(self.TheGift)
 					self.parent:Speak("*"..getText("ContextMenu_SD_EquipsArmor").."*")
-					EquipAnyArmor(self.TheGift,self.parent.player)
+					self.parent.player:setClothingItem_Back(self.TheGift)
+				elseif  instanceof(self.TheGift,"Clothing") then
+					print("gift clothing body location is:" .. tostring(self.TheGift:getBodyLocation()))
+					self.parent:getBag():Remove(self.TheGift)
+					self.parent:Get():getInventory():AddItem(self.TheGift)
+					self.parent:Speak("*"..getText("ContextMenu_SD_EquipsArmor").."*")
+					self.parent:WearThis(self.TheGift)
 				end
 			else
+				self.parent:StopWalk()
 				ISTimedActionQueue.add(ISInventoryTransferAction:new (self.parent.player, self.TheGift, self.TheGift:getContainer(), self.parent:getBag(), 20))
 			end
 		elseif(self.DestContainer:contains(self.TheGift)) then
@@ -93,17 +104,17 @@ function TakeGiftTask:update()
 			self.Complete = true
 			
 			local itemType = self.TheGift:getType()
-			if (isModEnabled("ArmorMod")) and (GlobalArmor ~= nil) and (GlobalArmor[itemType] ~= nil) then
+			if self.TheGift:isClothing()  then
 				self.parent:getBag():Remove(self.TheGift)
 				self.parent:Get():getInventory():AddItem(self.TheGift)
 				self.parent:Speak("*"..getText("ContextMenu_SD_EquipsArmor").."*")
-				EquipAnyArmor(self.TheGift,self.parent.player)
+				self.parent:WearThis(self.TheGift)
 			end
 		else
 			
 			
 			if(x ~= nil) then
-				local sq = self.parent:Get():getCell():getOrCreateGridSquare(math.floor(x),math.floor(y),math.floor(z))
+				local sq = self.parent:Get():getCell():getGridSquare(math.floor(x),math.floor(y),math.floor(z))
 				if(sq ~= nil) then self.parent:walkTo(sq) end
 			end
 		end

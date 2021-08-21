@@ -2,15 +2,21 @@
 function AIManager(TaskMangerIn)
 	
 	local ASuperSurvivor = TaskMangerIn.parent	
+	if(ASuperSurvivor.DebugMode) then print(ASuperSurvivor:getName().." "..ASuperSurvivor:getAIMode() .. " AIManager1 " .. TaskMangerIn:getCurrentTask()) end
 	
 	if(ASuperSurvivor:needToFollow()) or (ASuperSurvivor:Get():getVehicle() ~= nil) then return TaskMangerIn end
 	
-
-	if (TaskMangerIn == nil) or (ASuperSurvivor == nil) then return false end
+	if(ASuperSurvivor.DebugMode) then print(ASuperSurvivor:getName().." "..ASuperSurvivor:getAIMode() .. " AIManager2") end
+	if (TaskMangerIn == nil) or (ASuperSurvivor == nil) then 
+		print("error TaskMangerIn or ASuperSurvivor was nil")
+		return false 
+	end
 	
 	local EnemyIsSurvivor = (instanceof(ASuperSurvivor.LastEnemeySeen,"IsoPlayer"))
 	local EnemySuperSurvivor = nil
+	local LastSuperSurvivor = nil
 	local EnemyIsSurvivorHasGun = false
+	local LastSurvivorHasGun = false
 	if(EnemyIsSurvivor) then 
 		local id = ASuperSurvivor.LastEnemeySeen:getModData().ID
 		
@@ -19,36 +25,60 @@ function AIManager(TaskMangerIn)
 			EnemyIsSurvivorHasGun = EnemySuperSurvivor:hasGun()
 		end
 	end
+	if(ASuperSurvivor.LastSurvivorSeen) then 
+		local lsid = ASuperSurvivor.LastSurvivorSeen:getModData().ID
+		
+		LastSuperSurvivor = SSM:Get(lsid) 
+		if(LastSuperSurvivor) then
+			LastSurvivorHasGun = LastSuperSurvivor:hasGun()
+		end
+	end
 	local IHaveInjury = ASuperSurvivor:HasInjury()
+	local weapon = ASuperSurvivor.player:getPrimaryHandItem()
 	local IsInAction = ASuperSurvivor:isInAction()
 	local HisGroup = ASuperSurvivor:getGroup()
 	local IsInBase = ASuperSurvivor:isInBase()
 	local CenterBaseSquare = nil
+	local DistanceBetweenMainPlayer = getDistanceBetween(getSpecificPlayer(0),ASuperSurvivor:Get()) 
 	if(HisGroup) then CenterBaseSquare = HisGroup:getBaseCenter() end
 	
 		-------------shared ai for all -----------------------------------------------
 	
-	if (TaskMangerIn:getCurrentTask() ~= "Enter New Building") and ASuperSurvivor:isWalkingPermitted() and EnemyIsSurvivor and ASuperSurvivor:hasWeapon() and (EnemyIsSurvivorHasGun == false or ASuperSurvivor:hasGun()) and (ASuperSurvivor.LastEnemeySeen ~= nil) and (ASuperSurvivor:getDangerSeenCount() == 0) and (IHaveInjury == false) and TaskMangerIn:getCurrentTask() ~= "Pursue" then
+	if (TaskMangerIn:getCurrentTask() ~= "Enter New Building") and (TaskMangerIn:getCurrentTask() ~= "Threaten") and ASuperSurvivor:isWalkingPermitted() and EnemyIsSurvivor and ASuperSurvivor:hasWeapon() and (EnemyIsSurvivorHasGun == false or ASuperSurvivor:hasGun()) and (ASuperSurvivor.LastEnemeySeen ~= nil) and (ASuperSurvivor:getDangerSeenCount() == 0) and (IHaveInjury == false) and TaskMangerIn:getCurrentTask() ~= "Pursue" then
 		if(ASuperSurvivor:Get():getModData().isHostile) and (ASuperSurvivor:isSpeaking() == false) then ASuperSurvivor:Speak(getSpeech("GonnaGetYou")) end
 		TaskMangerIn:AddToTop(PursueTask:new(ASuperSurvivor,ASuperSurvivor.LastEnemeySeen))
 	end
 	
-	-- attack
-		--ASuperSurvivor:Speak( tostring(TaskMangerIn:getCurrentTask()~= "Attack") .. "," .. tostring(TaskMangerIn:getCurrentTask() ~= "Doctor")  .. "," ..  tostring(ASuperSurvivor:isInSameRoom(ASuperSurvivor.LastEnemeySeen))  .. "," ..  tostring(TaskMangerIn:getCurrentTask() ~= "Flee")  .. "," ..  tostring(IHaveInjury == false) .. "," .. tostring(((ASuperSurvivor:hasWeapon() and (ASuperSurvivor:getDangerSeenCount() >= 1)) or (ASuperSurvivor:hasWeapon() == false and (ASuperSurvivor:getDangerSeenCount() == 1) and (not EnemyIsSurvivor)))) )
-	if ((TaskMangerIn:getCurrentTask() ~= "Attack") and (TaskMangerIn:getCurrentTask() ~= "Doctor") and (ASuperSurvivor:isInSameRoom(ASuperSurvivor.LastEnemeySeen)) and (TaskMangerIn:getCurrentTask() ~= "Flee")) and ((ASuperSurvivor:hasWeapon() and (ASuperSurvivor:getDangerSeenCount() >= 1)) or (ASuperSurvivor:hasWeapon() == false and (ASuperSurvivor:getDangerSeenCount() == 1) and (not EnemyIsSurvivor))) and (IHaveInjury == false) then
-		--ASuperSurvivor:Speak( "here i am!")
-		TaskMangerIn:AddToTop(AttackTask:new(ASuperSurvivor))
+
+		
+	--if( (TaskMangerIn:getCurrentTask() ~= "Surender") and EnemyIsSurvivor and EnemyIsSurvivorHasGun and  EnemySuperSurvivor and not ASuperSurvivor:usingGun() and EnemyIsSurvivor.player:isAiming() and (getDistanceBetween(EnemySuperSurvivor:Get(),ASuperSurvivor:Get()) < 6)) then
+	--	TaskMangerIn:AddToTop(SurenderTask:new(ASuperSurvivor, EnemySuperSurvivor))
+	--end
+	if(getSpecificPlayer(0) ~= nil) then
+		local facingResult = getSpecificPlayer(0):getDotWithForwardDirection(ASuperSurvivor.player:getX(),ASuperSurvivor.player:getY())
+		--ASuperSurvivor:Speak( tostring(facingResult) )
+		if( (TaskMangerIn:getCurrentTask() ~= "Surender") and (TaskMangerIn:getCurrentTask() ~= "Flee" )and (TaskMangerIn:getCurrentTask() ~= "Flee From Spot") and (TaskMangerIn:getCurrentTask() ~= "Clean Inventory") and SSM:Get(0):usingGun() and  getSpecificPlayer(0) and getSpecificPlayer(0):CanSee(ASuperSurvivor.player) and (not ASuperSurvivor:usingGun() or (not ASuperSurvivor:RealCanSee(getSpecificPlayer(0)) and DistanceBetweenMainPlayer<=3 )) and getSpecificPlayer(0):isAiming() and IsoPlayer.getCoopPVP() and not ASuperSurvivor:isInGroup(getSpecificPlayer(0)) and (facingResult > 0.95 ) and (DistanceBetweenMainPlayer < 6)) then
+			TaskMangerIn:clear()
+			TaskMangerIn:AddToTop(SurenderTask:new(ASuperSurvivor, SSM:Get(0)))
+			return TaskMangerIn
+		end
+	end
+		
+	if ((TaskMangerIn:getCurrentTask() ~= "Attack") and (TaskMangerIn:getCurrentTask() ~= "Threaten") and not ((TaskMangerIn:getCurrentTask() == "Surender") and EnemyIsSurvivor) and (TaskMangerIn:getCurrentTask() ~= "Doctor") and (ASuperSurvivor:isInSameRoom(ASuperSurvivor.LastEnemeySeen)) and (TaskMangerIn:getCurrentTask() ~= "Flee")) and ((ASuperSurvivor:hasWeapon() and ((ASuperSurvivor:getDangerSeenCount() >= 1) or (ASuperSurvivor:isEnemyInRange(ASuperSurvivor.LastEnemeySeen)))) or (ASuperSurvivor:hasWeapon() == false and (ASuperSurvivor:getDangerSeenCount() == 1) and (not EnemyIsSurvivor))) and (IHaveInjury == false) then
+		--ASuperSurvivor:Speak( ASuperSurvivor:getName()..": need to attack")
+		if(ASuperSurvivor.player:getModData().isRobber) and (not ASuperSurvivor.player:getModData().hitByCharacter) and EnemyIsSurvivor and (not EnemySuperSurvivor.player:getModData().dealBreaker) then TaskMangerIn:AddToTop(ThreatenTask:new(ASuperSurvivor,EnemySuperSurvivor,"Scram"))
+		else TaskMangerIn:AddToTop(AttackTask:new(ASuperSurvivor)) end
 	end
 	-- find safe place if injured and enemies near
 	if (TaskMangerIn:getCurrentTask() ~= "Find Building") and (TaskMangerIn:getCurrentTask() ~= "Flee") and (IHaveInjury) and (ASuperSurvivor:getDangerSeenCount() > 0) then
 		TaskMangerIn:AddToTop(FindBuildingTask:new(ASuperSurvivor))
 	end
 	-- bandage injuries if no threat near by
-	if (TaskMangerIn:getCurrentTask() ~= "First Aide") and (TaskMangerIn:getCurrentTask() ~= "Doctor") and (TaskMangerIn:getCurrentTask() ~= "Hold Still") and (IHaveInjury) and (ASuperSurvivor:getDangerSeenCount() == 0) then
+	if (TaskMangerIn:getCurrentTask() ~= "First Aide") and (TaskMangerIn:getCurrentTask() ~= "Flee From Spot") and (TaskMangerIn:getCurrentTask() ~= "Flee") and (TaskMangerIn:getCurrentTask() ~= "Doctor") and (TaskMangerIn:getCurrentTask() ~= "Hold Still") and (IHaveInjury) and (ASuperSurvivor:getDangerSeenCount() == 0) then
 		TaskMangerIn:AddToTop(FirstAideTask:new(ASuperSurvivor))
 	end
 	-- flee from too many zombies
-	if (TaskMangerIn:getCurrentTask() ~= "Flee") and (ASuperSurvivor:getDangerSeenCount() > 0) and ((ASuperSurvivor:isTooScaredToFight()) or (not ASuperSurvivor:hasWeapon() and ASuperSurvivor:getDangerSeenCount() > 1) or (IHaveInjury and ASuperSurvivor:getDangerSeenCount() > 0) or (EnemyIsSurvivorHasGun and ASuperSurvivor:hasGun() == false) ) then
+	if (TaskMangerIn:getCurrentTask() ~= "Flee") and ((TaskMangerIn:getCurrentTask() ~= "Surender") and not EnemyIsSurvivor) and (ASuperSurvivor:getDangerSeenCount() > 0) and ((ASuperSurvivor:isTooScaredToFight()) or (not ASuperSurvivor:hasWeapon() and ASuperSurvivor:getDangerSeenCount() > 1) or (IHaveInjury and ASuperSurvivor:getDangerSeenCount() > 0) or (EnemyIsSurvivorHasGun and ASuperSurvivor:hasGun() == false) ) then
 		if(TaskMangerIn:getCurrentTask() == "LootCategoryTask") then -- currently to dangerous to loot said building. so give up it
 			TaskMangerIn:getTask():ForceFinish()
 		end
@@ -91,9 +121,10 @@ function AIManager(TaskMangerIn)
 		end		
 	end
 	
-	if((ASuperSurvivor:Get():getModData().InitGreeting ~= nil) or (ASuperSurvivor:getAIMode() == "Random Solo")) and (TaskMangerIn:getCurrentTask() ~= "Listen") and (TaskMangerIn:getCurrentTask() ~= "Take Gift") and (ASuperSurvivor.LastSurvivorSeen ~= nil) and (ASuperSurvivor.LastSurvivorSeen:isGhostMode() == false) and (ASuperSurvivor:getSpokeTo(ASuperSurvivor.LastSurvivorSeen:getModData().ID) == false) and (getDistanceBetween(ASuperSurvivor.LastSurvivorSeen,ASuperSurvivor:Get()) < 8) and (ASuperSurvivor:getDangerSeenCount()==0) and (TaskMangerIn:getCurrentTask() ~= "First Aide") and (ASuperSurvivor:Get():CanSee(ASuperSurvivor.LastSurvivorSeen)) then
+	if((ASuperSurvivor:Get():getModData().InitGreeting ~= nil) or (ASuperSurvivor:getAIMode() == "Random Solo")) and (TaskMangerIn:getCurrentTask() ~= "Listen") and (TaskMangerIn:getCurrentTask() ~= "Surender") and (TaskMangerIn:getCurrentTask() ~= "Flee From Spot") and (TaskMangerIn:getCurrentTask() ~= "Take Gift") and (ASuperSurvivor.LastSurvivorSeen ~= nil) and (ASuperSurvivor.LastSurvivorSeen:isGhostMode() == false) and (ASuperSurvivor:getSpokeTo(ASuperSurvivor.LastSurvivorSeen:getModData().ID) == false) and (getDistanceBetween(ASuperSurvivor.LastSurvivorSeen,ASuperSurvivor:Get()) < 8) and (ASuperSurvivor:getDangerSeenCount()==0) and (TaskMangerIn:getCurrentTask() ~= "First Aide") and (ASuperSurvivor:Get():CanSee(ASuperSurvivor.LastSurvivorSeen)) then
 			ASuperSurvivor:Speak(getText("ContextMenu_SD_HeyYou"))
 			ASuperSurvivor:SpokeTo(ASuperSurvivor.LastSurvivorSeen:getModData().ID)
+			print(ASuperSurvivor:getName() .. " adding listen task")
 			TaskMangerIn:AddToTop(ListenTask:new(ASuperSurvivor,ASuperSurvivor.LastSurvivorSeen,true))
 	end
 		
@@ -107,12 +138,19 @@ function AIManager(TaskMangerIn)
 			TaskMangerIn:AddToTop(EquipWeaponTask:new(ASuperSurvivor))
 	end
 	
+	
+	--print( tostring(IsInAction == false) .." and ".. tostring(ASuperSurvivor:getNeedAmmo() == false) .." and ".. tostring(ASuperSurvivor:usingGun()) .." and ".. tostring(ASuperSurvivor:getDangerSeenCount() == 0) .." and (".. tostring(ASuperSurvivor:needToReload()) .." or ".. tostring(ASuperSurvivor:needToReadyGun(weapon)) .. ")" )
+	if(IsInAction == false) and (ASuperSurvivor:getNeedAmmo() == false) and ASuperSurvivor:usingGun() and (ASuperSurvivor:getDangerSeenCount() == 0) and ((ASuperSurvivor:needToReload()) or (ASuperSurvivor:needToReadyGun(weapon))) then			
+		--print(ASuperSurvivor:getName() .. " AI detected need to ready gun")
+		ASuperSurvivor:ReadyGun(weapon)				
+	end	
+	
 	-------------shared ai for all --------------END---------------------------------
 	
 	
 	
 	-------------If in base tasks ----------------------------------------
-	if(not getSpecificPlayer(0):isAsleep()) then
+	if(getSpecificPlayer(0) == nil) or (not getSpecificPlayer(0):isAsleep()) then
 		SafeToGoOutAndWork = true
 		
 		if(RainManager.isRaining()) and (ASuperSurvivor:Get():isOutside()) and (TaskMangerIn.TaskUpdateLimit ~= 0) and (TaskMangerIn:getCurrentTask() ~= "Enter New Building") and (TaskMangerIn:getCurrentTask() ~= "Find Building") then
@@ -158,7 +196,7 @@ function AIManager(TaskMangerIn)
 							elseif(randresult == 3) then
 								ASuperSurvivor:Speak(getText("ContextMenu_SD_IGoPileCorpse"))
 								local baseBounds = HisGroup:getBounds()
-								local dropSquare = getCell():getOrCreateGridSquare(baseBounds[1]-5,baseBounds[3]-5,0)
+								local dropSquare = getCell():getGridSquare(baseBounds[1]-5,baseBounds[3]-5,0)
 								local storagearea = HisGroup:getGroupArea("CorpseStorageArea")
 								if(storagearea[1] ~= 0) then dropSquare = getCenterSquareFromArea(storagearea[1],storagearea[2],storagearea[3],storagearea[4],storagearea[5]) end
 								if(dropSquare) then
@@ -174,7 +212,7 @@ function AIManager(TaskMangerIn)
 								local forage = HisGroup:getGroupAreaCenterSquare("ForageArea")
 								if(forage ~= nil) then 				
 									ASuperSurvivor:Speak(getText("ContextMenu_SD_IGoForage"))
-									TaskMangerIn:AddToTop(CleanInvTask:new(ASuperSurvivor,dropSquare)) 
+									TaskMangerIn:AddToTop(CleanInvTask:new(ASuperSurvivor,dropSquare,false)) 
 									TaskMangerIn:AddToTop(ForageTask:new(ASuperSurvivor)) 
 									TaskMangerIn:setTaskUpdateLimit(AutoWorkTaskTimeLimit)
 									ASuperSurvivor:walkTo(forage)
@@ -239,7 +277,7 @@ function AIManager(TaskMangerIn)
 							TaskMangerIn:AddToTop(FarmingTask:new(ASuperSurvivor)) 					
 							TaskMangerIn:setTaskUpdateLimit(AutoWorkTaskTimeLimit)					
 						else
-							print("area was nil")
+							print("farming area was nil")
 						end
 					end
 					
@@ -255,6 +293,7 @@ function AIManager(TaskMangerIn)
 	end	
 	-------------If in base tasks --END--------------------------------------
 	
+	if(ASuperSurvivor.DebugMode) then print(ASuperSurvivor:getAIMode()) end
 	
 	if(ASuperSurvivor:getAIMode() == "Random Solo") and (TaskMangerIn:getCurrentTask() ~= "Listen") and (TaskMangerIn:getCurrentTask() ~= "Take Gift") then -- solo random survivor AI flow	
 
@@ -274,7 +313,8 @@ function AIManager(TaskMangerIn)
 				TaskMangerIn:AddToTop(LootCategoryTask:new(ASuperSurvivor,ASuperSurvivor.TargetBuilding,"Food",0))
 			end
 		end
-		if(ASuperSurvivor:getBaseBuilding() == nil) and (ASuperSurvivor:getBuilding()) and (TaskMangerIn:getCurrentTask() ~= "First Aide") and (TaskMangerIn:getCurrentTask() ~= "Attack") and (TaskMangerIn:getCurrentTask() ~= "Barricade Building") and (ASuperSurvivor:hasWeapon())  and (ASuperSurvivor:hasFood()) then
+		--turning this off for now, somehow already used group ids being given as new ones?
+		if(false) and (ASuperSurvivor:getBaseBuilding() == nil) and (ASuperSurvivor:getBuilding()) and (TaskMangerIn:getCurrentTask() ~= "First Aide") and (TaskMangerIn:getCurrentTask() ~= "Attack") and (TaskMangerIn:getCurrentTask() ~= "Barricade Building") and (ASuperSurvivor:hasWeapon())  and (ASuperSurvivor:hasFood()) then
 			TaskMangerIn:clear()
 			ASuperSurvivor:setBaseBuilding(ASuperSurvivor:getBuilding())
 			TaskMangerIn:AddToTop(WanderInBuildingTask:new(ASuperSurvivor,ASuperSurvivor:getBuilding()))
@@ -290,12 +330,14 @@ function AIManager(TaskMangerIn)
 				local bounds = {def:getX()-1,(def:getX() + def:getW()+1 ), def:getY()-1,(def:getY() + def:getH()+1),0}
 				nGroup:setBounds(bounds)
 				--ASuperSurvivor:Speak(tostring(nGroup:getID()))
-			else
+			elseif(GroupId ~= SSM:Get(0):getGroupID()) then
 				local OwnerGroup = SSGM:Get(GroupId)
 				local LeaderID = OwnerGroup:getLeader()
 				if(LeaderID ~= 0) then
 					OwnerGroup:addMember(ASuperSurvivor,"Worker")
-					--ASuperSurvivor:Speak("Please let me stay here")
+					ASuperSurvivor:Speak("Please let me stay here")
+					local LeaderObj = SSM:Get(LeaderID)
+					if(LeaderObj) then LeaderObj:Speak("Welcome to our Group") end
 				end
 			end
 			
@@ -324,7 +366,8 @@ function AIManager(TaskMangerIn)
 	
 	
 
-		
+		if(ASuperSurvivor.DebugMode) then print(ASuperSurvivor:getName().." "..ASuperSurvivor:getAIMode() .. " AIManager3 " .. TaskMangerIn:getCurrentTask()) end
+	
 	
 	return TaskMangerIn
 

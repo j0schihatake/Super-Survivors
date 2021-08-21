@@ -95,7 +95,8 @@ function DoctorTask:update()
 					local rippedsheets = doctor:getInventory():FindAndReturn("RippedSheets")
 					if(rippedsheets == nil) then rippedsheets = doctor:getInventory():AddItem("Base.RippedSheets") end
 								
-					foundbodypartneedingtreatment = true					
+					foundbodypartneedingtreatment = true	
+					self.parent:StopWalk()
 					if treatment == "Splint" then 
 						self.parent:Speak(getText("ContextMenu_SD_DoctorSplint"))
 						ISTimedActionQueue.add(ISSplint:new(doctor, self.Patient, rippedsheets, doctor:getInventory():AddItem("Base.Plank"), bp, true))

@@ -18,7 +18,9 @@ function FindBuildingTask:new(superSurvivor)
 	return o
 
 end
-
+function FindBuildingTask:OnComplete()
+	self.parent:setSneaking(false)
+end
 function FindBuildingTask:isComplete()
 	return self.Complete 
 end
@@ -31,6 +33,7 @@ end
 function FindBuildingTask:update()
 	
 	if(not self:isValid()) then return false end
+	if(self.parent:getSeenCount() == 0) then self.parent:setSneaking(true) end
 	
 	if(self.parent:isInAction() == false) then
 		

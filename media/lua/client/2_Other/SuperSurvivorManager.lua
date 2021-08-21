@@ -9,9 +9,14 @@ function SuperSurvivorManager:new()
 		
 	o.SuperSurvivors = {}
 	o.SurvivorCount = 3
+	o.MainPlayer = 0
 	
 	return o
 
+end
+
+function SuperSurvivorManager:getRealPlayerID()
+	return self.MainPlayer
 end
 
 function SuperSurvivorManager:init()
@@ -24,6 +29,24 @@ function SuperSurvivorManager:setPlayer(player,ID)
 	self.SuperSurvivors[0]:setName("Player " .. tostring(ID))
 	
 	return self.SuperSurvivors[ID] ;
+end
+
+function SuperSurvivorManager:switchPlayer(newID)
+	
+	self.SuperSurvivors[newID].player:setBlockMovement(false)
+	self.SuperSurvivors[newID].player:setNPC(false)
+		
+	self.SuperSurvivors[self.MainPlayer].player:setBlockMovement(true)
+	self.SuperSurvivors[self.MainPlayer].player:setNPC(true)
+		
+	IsoPlayer.setInstance(self.SuperSurvivors[newID].player)
+	IsoPlayer.setLocalPlayer(0,self.SuperSurvivors[newID].player)
+	
+	self.MainPlayer = newID
+	
+	getSpecificPlayer(0):initSpritePartsEmpty();
+	getPlayerData(0).playerInventory:refreshBackpacks();
+	
 end
 
 function SuperSurvivorManager:LoadSurvivor(ID, square)
@@ -51,6 +74,9 @@ function SuperSurvivorManager:LoadSurvivor(ID, square)
 		if(self.SuperSurvivors[ID]:Get():getModData().isHostile == true) then self.SuperSurvivors[ID]:setHostile(true) end
 		
 		if(self.SurvivorCount == nil) then self.SurvivorCount = 1 end
+		print(tostring(ID))
+		print(tostring(self.SurvivorCount))
+		
 		if(ID > self.SurvivorCount) then self.SurvivorCount = ID end
 		self.SuperSurvivors[ID].player:getModData().LastSquareSaveX = nil
 		self.SuperSurvivors[ID]:SaveSurvivor()
@@ -100,9 +126,7 @@ function SuperSurvivorManager:LoadSurvivor(ID, square)
 			
 		end
 		
-		
-		if(isModEnabled("ArmorMod")) then ArmorInitCheck(self.SuperSurvivors[ID].player) end
-		
+			
 		local phi = self.SuperSurvivors[ID]:Get():getPrimaryHandItem() -- to trigger onEquipPrimary
 		self.SuperSurvivors[ID]:Get():setPrimaryHandItem(nil)
 		self.SuperSurvivors[ID]:Get():setPrimaryHandItem(phi)
@@ -136,16 +160,93 @@ function SuperSurvivorManager:Get(thisID)
 	end
 end
 
+function SuperSurvivorManager:OnDeath(ID)
+	
+	self.SuperSurvivors[ID] = nil
+
+end
+
 function SuperSurvivorManager:update()
-	--getSpecificPlayer(0):Say(tostring(self.SurvivorCount))
-	--print("SSM updating..."..tostring(self.SurvivorCount))
+	
 	for i=1, self.SurvivorCount+1 do
-	--local id = i
-	--local theSuperSurvivor = self.SuperSurvivors[i]
-	--if(self.SuperSurvivors[i] ~= nil) then getSpecificPlayer(0):Say(tostring(id)..") ".. tostring(theSuperSurvivor ~= nil) ..",".. tostring(theSuperSurvivor:updateTime()) ..","..  tostring(theSuperSurvivor:isInCell()) ) end
-		
-		if(self.SuperSurvivors[i] ~= nil) and (self.SuperSurvivors[i]:updateTime()) and (self.SuperSurvivors[i]:isInCell()) then self.SuperSurvivors[i]:update() end
+	
+		if(self.SuperSurvivors[i] ~= nil) and (self.MainPlayer ~= i) and (self.SuperSurvivors[i]:updateTime()) and (not self.SuperSurvivors[i].player:isAsleep()) and (self.SuperSurvivors[i]:isInCell()) then 
+			self.SuperSurvivors[i]:update() 
+			if(self.SuperSurvivors[i].DebugMode) then print(self.SuperSurvivors[i]:getName() .. " update()") end
+		end
 	end
+
+end
+function SuperSurvivorManager:AsleepHealAll()
+	
+	for i=1, self.SurvivorCount+1 do	
+		if(self.SuperSurvivors[i] ~= nil) and (self.MainPlayer ~= i) and (self.SuperSurvivors[i].player) then 
+			self.SuperSurvivors[i].player:getBodyDamage():AddGeneralHealth(10)
+		end
+	end
+
+end
+function SuperSurvivorManager:PublicExecution(SSW,SSV)
+	local maxdistance = 20
+	
+	for i=1, self.SurvivorCount+1 do
+		if(self.SuperSurvivors[i] ~= nil) and (self.SuperSurvivors[i]:isInCell()) then 
+			local distance = getDistanceBetween(self.SuperSurvivors[i]:Get(),getSpecificPlayer(0))
+			if(distance < maxdistance) and (self.SuperSurvivors[i]:Get():CanSee(SSV:Get())) then
+				
+				if(not self.SuperSurvivors[i]:isInGroup(SSW:Get()) and not self.SuperSurvivors[i]:isInGroup(SSV:Get())) then
+					
+					if(self.SuperSurvivors[i]:usingGun()) and (ZombRand(2)==1) then
+						--chance to attack with gun if see someone near by get executed
+						print(self.SuperSurvivors[i]:getName() .. " attacking the murderer with gun")
+						self.SuperSurvivors[i]:Get():getModData().hitByCharacter = true
+						
+					else
+						-- flee from the crazy murderer
+						print(self.SuperSurvivors[i]:getName() .. " fleeing from the crazy murderer")
+						self.SuperSurvivors[i]:getTaskManager():AddToTop(FleeFromHereTask:new(self.SuperSurvivors[i],SSW:Get():getCurrentSquare()))
+					end
+					self.SuperSurvivors[i]:SpokeTo(SSW:Get():getModData().ID)
+					self.SuperSurvivors[i]:SpokeTo(SSV:Get():getModData().ID)
+					
+				end
+				
+			end
+		end
+	end
+	
+
+end
+
+function SuperSurvivorManager:GunShotHandle(SSW)
+	local maxdistance = 20
+	local weapon = getSpecificPlayer(0):getPrimaryHandItem()
+	if not weapon then return false end
+	
+	local range = weapon:getSoundRadius();
+	for i=1, self.SurvivorCount+1 do
+		if(self.SuperSurvivors[i] ~= nil) and (self.SuperSurvivors[i]:isInCell()) then 
+			local distance = getDistanceBetween(self.SuperSurvivors[i]:Get(),getSpecificPlayer(0))
+			
+				
+				
+				if(self.SuperSurvivors[i].player:getModData().surender) and (distance < maxdistance) and self.SuperSurvivors[i]:Get():CanSee(SSW:Get()) and self.SuperSurvivors[i].player:CanSee(getSpecificPlayer(0)) then
+					-- flee from the crazy murderer
+					print(self.SuperSurvivors[i]:getName() .. " fleeing from the crazy murderer")
+					self.SuperSurvivors[i]:getTaskManager():AddToTop(FleeFromHereTask:new(self.SuperSurvivors[i],SSW:Get():getCurrentSquare()))
+					self.SuperSurvivors[i]:SpokeTo(SSW:Get():getModData().ID)
+				end
+				
+				if(self.SuperSurvivors[i].player:getModData().isHostile or self.SuperSurvivors[i]:getCurrentTask() == "Guard" or self.SuperSurvivors[i]:getCurrentTask() == "Patrol") and self.SuperSurvivors[i]:getTaskManager():getCurrentTask() ~= "Surender" and not self.SuperSurvivors[i].player:isDead() and not self.SuperSurvivors[i]:RealCanSee(getSpecificPlayer(0)) and (getDistanceBetween(getSpecificPlayer(0),self.SuperSurvivors[i].player) <= range) then
+					print(self.SuperSurvivors[i]:getName().. " adding go check it out task")
+					self.SuperSurvivors[i]:getTaskManager():AddToTop(GoCheckItOutTask:new(self.SuperSurvivors[i],getSpecificPlayer(0):getCurrentSquare()))
+				end
+				
+				
+			
+		end
+	end
+	
 
 end
 
@@ -185,6 +286,16 @@ function SuperSurvivorManager:GetClosestNonParty()
 
 end
 
+function SuperSurvivorManager:SaveAll()
+	
+	for i=1, self.SurvivorCount+1 do
+		if(self.SuperSurvivors[i] ~= nil) and (self.SuperSurvivors[i]:isInCell()) then 			
+			self.SuperSurvivors[i]:SaveSurvivor()
+		end
+	end
+
+end
+
 SSM = SuperSurvivorManager:new()
 
 
@@ -201,32 +312,53 @@ function loadSurvivorMap( )
 		print("SurvivorManagerInfo was not found. this save file could be corrupt");
 	end
 	
+	SurvivorLocX = kvtableload("SurvivorLocX")
+	SurvivorLocY = kvtableload("SurvivorLocY")
+	SurvivorLocZ = kvtableload("SurvivorLocZ")
+	
+	
 	local fileTable = {}
-	local readFile = getModFileReader("SuperSurvivors",getWorld():getWorld()..getFileSeparator().."SurvivorMap.lua", true)
+	
+	for k,v in pairs(SurvivorLocX) do   --- trying new way of saving & loading survivor map
+	
+		local key = SurvivorLocX[k] .. SurvivorLocY[k] .. SurvivorLocZ[k]
+		
+		if(not fileTable[key]) then fileTable[key] = {} end
+		print("survivor loc: "..tostring(fileTable[key])..", "..tostring(k))
+		table.insert(fileTable[key], tonumber(k))	
+	
+	end
+	
+	return fileTable
+	--[[
+	local readFile = getModFileReader("SuperbSurvivors",getWorld():getWorld()..getFileSeparator().."SurvivorMap.lua", true)
 	local scanLine = readFile:readLine()
 	while scanLine do
 	
 		local values = {}
 		for input in scanLine:gmatch("%S+") do table.insert(values,input) end
 		--print("loading line: "..values[1] .. " " .. values[2])
-		if(fileTable[values[1]] == nil) then fileTable[values[1]] = {} end
-			table.insert(fileTable[values[1]], tonumber(values[2]))
+		if(fileTable[ values[1] ] == nil) then fileTable[ values[1] ] = {} end
+			table.insert(fileTable[ values[1] ], tonumber(values[2]))
 		scanLine = readFile:readLine()
 		if not scanLine then break end
 	end
 	readFile:close()
-	return fileTable
+	return fileTable ]]
 end
 
 
 function saveSurvivorMap(  )
 	
+	
 	local tempTable = {}
 	tempTable[1] = SSM.SurvivorCount
 	table.save(tempTable,"SurvivorManagerInfo")
 	
+	--[[
+	if(not SurvivorMap) then return false end
 	local destFile = getWorld():getWorld()..getFileSeparator().."SurvivorMap.lua"
-	local writeFile = getModFileWriter("SuperSurvivors", destFile, true, false)
+	local writeFile = getModFileWriter("SuperbSurvivors", destFile, true, false)
 	--print("saving SurvivorMap:".. tostring(SurvivorMap))
 	for index,value in pairs(SurvivorMap) do
 		
@@ -236,6 +368,10 @@ function saveSurvivorMap(  )
 		end
 	end
 	writeFile:close();
+	]]
+	kvtablesave(SurvivorLocX,"SurvivorLocX")
+	kvtablesave(SurvivorLocY,"SurvivorLocY")
+	kvtablesave(SurvivorLocZ,"SurvivorLocZ")
 end
 
 

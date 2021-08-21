@@ -18,6 +18,10 @@ function PursueTask:new(superSurvivor, target)
 	o.LastSquareSeen = o.Target:getCurrentSquare()
 	local ID = o.Target:getModData().ID
 	o.TargetSS = SSM:Get(ID)
+	if(not o.TargetSS) then 
+		o.Complete = true
+		return nil 
+	end
 	if(o.TargetSS:getBuilding()~= nil) then o.parent.TargetBuilding = o.TargetSS:getBuilding() end
 	
 	if(superSurvivor.LastGunUsed ~= nil) and (superSurvivor:Get():getPrimaryHandItem() ~= superSurvivor.LastGunUsed) then

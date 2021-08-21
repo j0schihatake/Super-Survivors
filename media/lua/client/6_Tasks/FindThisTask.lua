@@ -72,6 +72,7 @@ function FindThisTask:update()
 	if(self.TargetItem == nil) then 
 		print("going to FindThisNearBy")
 			self.TargetItem = self.parent:FindThisNearBy(self.itemtype,self.COT)
+			if(self.TargetItem == nil) and (self.itemtype=="Axe") then self.TargetItem = self.parent:FindThisNearBy("WoodAxe",self.COT) end
 		print("done FindThisNearBy:"..tostring(self.TargetItem))
 	end
 	
@@ -101,9 +102,9 @@ function FindThisTask:update()
 			self.parent:walkTo(targetSquare)
 		else
 			if (instanceof(self.TargetItem,"InventoryItem")) and (self.parent:getBag():hasRoomFor(self.parent:Get(),self.TargetItem) == false) then
-				self.parent:getTaskManager():AddToTop(CleanInvTask:new(self.parent,self.parent:Get():getCurrentSquare()))
+				self.parent:getTaskManager():AddToTop(CleanInvTask:new(self.parent,self.parent:Get():getCurrentSquare(),false))
 			elseif (instanceof(self.TargetItem,"IsoWorldInventoryObject")) and (self.parent:getBag():hasRoomFor(self.parent:Get(),self.TargetItem:getItem()) == false) then
-				self.parent:getTaskManager():AddToTop(CleanInvTask:new(self.parent,self.parent:Get():getCurrentSquare()))
+				self.parent:getTaskManager():AddToTop(CleanInvTask:new(self.parent,self.parent:Get():getCurrentSquare(),false))
 			end
 			
 			if(instanceof(self.TargetItem,"IsoObject")) then
@@ -153,6 +154,7 @@ function FindThisTask:update()
 						end
 						
 					else
+						self.parent:StopWalk()
 						ISTimedActionQueue.add(ISInventoryTransferAction:new(self.parent.player, self.TargetItem, self.TargetItem:getContainer(), self.BagToPutIn, 20))
 						self.parent:Speak(getText("ContextMenu_SD_TakesFromCont_Before") .. self.TargetItem:getDisplayName() .. getText("ContextMenu_SD_TakesFromCont_After"))
 						self.FoundCount = self.FoundCount + 1

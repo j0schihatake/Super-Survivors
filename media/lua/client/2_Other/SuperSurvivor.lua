@@ -2,12 +2,15 @@
 SuperSurvivor = {}
 SuperSurvivor.__index = SuperSurvivor
 
+SurvivorVisionCone = 0.90
+
 function SuperSurvivor:new(isFemale,square)
 	
 	local o = {}	
 	setmetatable(o, self)
 	self.__index = self
-		
+	
+	o.DebugMode = false
 	o.NumberOfBuildingsLooted = 0
 	o.AttackRange = 0.5
 	o.UsingFullAuto = false
@@ -15,7 +18,7 @@ function SuperSurvivor:new(isFemale,square)
 	o.GroupBraveryUpdatedTicks = 0
 	o.WaitTicks = 0
 	o.TriggerHeldDown = false
-	o.player = o:spawnPlayer(square)
+	o.player = o:spawnPlayer(square, isFemale)
 	o.userName = TextDrawObject.new()
 	o.userName:setAllowAnyImage(true);
 	o.userName:setDefaultFont(UIFont.Small);
@@ -57,6 +60,8 @@ function SuperSurvivor:new(isFemale,square)
 	o.Pants = nil
 	o.WasOnScreen = false
 	
+	o.PathingCounter = 0
+	o.GoFindThisCounter = 0
 	o.SpokeToRecently = {}
 	o.SquareWalkToAttempts = {}
 	o.SquaresExplored = {}
@@ -64,8 +69,28 @@ function SuperSurvivor:new(isFemale,square)
 	for i=1, #LootTypes do o.SquareContainerSquareLooteds[LootTypes[i]] = {} end
 	
 	o:setBravePoints(SuperSurvivorBravery)
+
+	local result = ZombRand(6)
+	local Dress = "RandomBasic"
 	
 	
+		if(o.player:getPerkLevel(Perks.FromString("Aiming")) >= 5) then 
+			local innerresult = ZombRand(3)
+			if(innerresult == 1) then
+				Dress = "ArmyCamo"
+				o:giveWeapon("Base.AssaultRifle")
+			elseif(innerresult == 2) then
+				Dress = "Army"
+				o:giveWeapon("Base.AssaultRifle")
+			else
+				Dress = "Police"
+				o:giveWeapon("Base.Pistol3")
+			end
+		elseif(o.player:getPerkLevel(Perks.FromString("Doctor")) >= 3) then
+			Dress = "Doctor"			
+		end
+		
+		o:SuitUp(Dress)
 	
 	return o
 end
@@ -80,6 +105,7 @@ function SuperSurvivor:newLoad(ID,square)
 	o.UsingFullAuto = false
 	o.GroupBraveryBonus = 0
 	o.GroupBraveryUpdatedTicks = 0
+	o.DebugMode = false
 	o.NumberOfBuildingsLooted = 0
 	o.WaitTicks = 0
 	o.TriggerHeldDown = false
@@ -125,6 +151,8 @@ function SuperSurvivor:newLoad(ID,square)
 	o.Pants = nil
 	o.WasOnScreen = false
 	
+	o.GoFindThisCounter = 0
+	o.PathingCounter = 0
 	o.SpokeToRecently = {}
 	o.SquareWalkToAttempts = {}
 	o.SquaresExplored = {}
@@ -145,6 +173,7 @@ function SuperSurvivor:newSet(player)
 		
 	o.AttackRange = 0.5
 	o.UsingFullAuto = false
+	o.DebugMode = false
 	o.NumberOfBuildingsLooted = 0
 	o.GroupBraveryBonus = 0
 	o.GroupBraveryUpdatedTicks = 0
@@ -158,6 +187,8 @@ function SuperSurvivor:newSet(player)
 	o.JustSpoke = false
 	o.SayLine1 = ""
 	
+	o.GoFindThisCounter = 0
+	o.PathingCounter = 0
 	o.player = player
 	o.WaitTicks = 0
 	o.LastSurvivorSeen = nil
@@ -183,6 +214,7 @@ function SuperSurvivor:newSet(player)
 	o.BaseBuilding = nil
 	o.SquareWalkToAttempts = {}
 	o.SquaresExplored = {}
+	o.SpokeToRecently = {}
 	o.SquareContainerSquareLooteds = {}
 	for i=1, #LootTypes do o.SquareContainerSquareLooteds[LootTypes[i]] = {} end
 	
@@ -237,8 +269,8 @@ function SuperSurvivor:isInGroup(thisGuy)
 
 	if(self:getGroupID() == nil) then return false
 	elseif(thisGuy:getModData().Group == nil) then return false
-	elseif (thisGuy:getModData().Group ~= self:getGroupID()) then return false
-	else return true end
+	elseif (thisGuy:getModData().Group == self:getGroupID()) then return true
+	else return false end
 
 end
 function SuperSurvivor:isGroupless(thisGuy)
@@ -247,7 +279,21 @@ function SuperSurvivor:isGroupless(thisGuy)
 	else return true end
 
 end
-
+function SuperSurvivor:getX()
+	return self.player:getX()
+end
+function SuperSurvivor:getY()
+	return self.player:getY()
+end
+function SuperSurvivor:getZ()
+	return self.player:getZ()
+end
+function SuperSurvivor:getCurrentSquare()
+	return self.player:getCurrentSquare()
+end
+function SuperSurvivor:getModData()
+	return self.player:getModData()
+end
 function SuperSurvivor:getName()
 	return self.player:getForname()
 end
@@ -271,15 +317,15 @@ end
 
 function SuperSurvivor:renderName()
 
-	if (not self.userName) or ((not self.JustSpoke) and ((not self:isInCell()) or (self:Get():getAlpha() ~= 1.0) or (not getSpecificPlayer(0):CanSee(self.player)))) then return false end
+	if (not self.userName) or ((not self.JustSpoke) and ((not self:isInCell()) or (self:Get():getAlpha() ~= 1.0) or getSpecificPlayer(0)==nil or (not getSpecificPlayer(0):CanSee(self.player)))) then return false end
 	
 	if(self.JustSpoke == true) and (self.TicksSinceSpoke == 0) then
 		self.TicksSinceSpoke = 250		
-		self.userName:ReadString(self.player:getForname() .. "\n" .. self.SayLine1)
+		self.userName:ReadString(self.player:getForname() .."\n" .. self.SayLine1)
 	elseif(self.TicksSinceSpoke > 0) then
 		self.TicksSinceSpoke = self.TicksSinceSpoke - 1
 		if(self.TicksSinceSpoke == 0) then
-			self.userName:ReadString(self.player:getForname());
+			self.userName:ReadString(self.player:getForname() );
 			self.JustSpoke = false
 			self.SayLine1 = ""
 		end	
@@ -317,7 +363,7 @@ function SuperSurvivor:reload()
 	local cs = self.player:getCurrentSquare()
 	local id = self:getID()
 	self:delete()
-	self.player = self:spawnPlayer(cs)
+	self.player = self:spawnPlayer(cs,nil)
 	self:loadPlayer(cs,id)
 end
 
@@ -327,9 +373,11 @@ function SuperSurvivor:loadPlayer(square, ID)
 	if (ID ~= nil) and (checkSaveFileExists("Survivor"..tostring(ID))) then
 		
 		local BuddyDesc = SurvivorFactory.CreateSurvivor();
-		local realplayer = getSpecificPlayer(0);
+		--local realplayer = getSpecificPlayer(0);
 		local Buddy = IsoPlayer.new(getWorld():getCell(),BuddyDesc,square:getX(),square:getY(),square:getZ());
-		IsoPlayer.setInstance(realplayer);
+		--IsoPlayer.setInstance(Buddy);
+		--Buddy:update();
+		--IsoPlayer.setInstance(realplayer);
 		Buddy:getInventory():emptyIt();
 		local filename = getSaveDir() .. "Survivor"..tostring(ID);
 		Buddy:load( filename );
@@ -338,13 +386,13 @@ function SuperSurvivor:loadPlayer(square, ID)
 		Buddy:setY(square:getY())
 		Buddy:setZ(square:getZ())
 		Buddy:getModData().ID = ID
-		
+		Buddy:setNPC(true);
 		Buddy:setBlockMovement(true)
+		Buddy:setSceneCulled(false)
+		--Buddy:dressInRandomOutfit()
+		--Buddy:dressInNamedOutfit(Buddy:getRandomDefaultOutfit())
 		
-		if(true) then
-			if(Buddy:isFemale()) then Buddy:setModel("kate.txt");
-			else Buddy:setModel("male.txt"); end
-		end
+		
 		
 		print("loading survivor " .. tostring(ID) .. " from file")
 		return Buddy
@@ -355,7 +403,35 @@ function SuperSurvivor:loadPlayer(square, ID)
 
 end
 
-function SuperSurvivor:spawnPlayer(square)
+function SuperSurvivor:WearThis(ClothingItemName) -- should already be in inventory
+
+	local ClothingItem
+	if(instanceof(ClothingItemName,"InventoryItem")) then ClothingItem = ClothingItemName
+	else ClothingItem = instanceItem(ClothingItemName) end
+	 
+	if not ClothingItem then return false end
+	self.player:getInventory():AddItem(ClothingItem)
+
+	if instanceof(ClothingItem, "InventoryContainer") and ClothingItem:canBeEquipped() ~= "" then
+		self.player:setWornItem(ClothingItem:canBeEquipped(), ClothingItem);
+		getPlayerData(self.player:getPlayerNum()).playerInventory:refreshBackpacks();
+		--self.player:initSpritePartsEmpty();
+	elseif ClothingItem:getCategory() == "Clothing" then
+		if ClothingItem:getBodyLocation() ~= "" then
+			print(ClothingItem:getDisplayName() .. " " ..tostring(ClothingItem:getBodyLocation()))
+			self.player:setWornItem(ClothingItem:getBodyLocation(), nil);
+			self.player:setWornItem(ClothingItem:getBodyLocation(), ClothingItem);
+		end
+	else
+		return false
+	end
+	
+	self.player:initSpritePartsEmpty();
+	triggerEvent("OnClothingUpdated", self.player)
+
+end
+
+function SuperSurvivor:spawnPlayer(square, isFemale)
 
 	
 	local BuddyDesc
@@ -363,21 +439,24 @@ function SuperSurvivor:spawnPlayer(square)
 		BuddyDesc = SurvivorFactory.CreateSurvivor();
 	else 		
 		BuddyDesc = SurvivorFactory.CreateSurvivor(nil, isFemale);
-		isFemale = nil;
 	end
 	
 	SurvivorFactory.randomName(BuddyDesc);
 	
 	local Z = 0;
 	if(square:isSolidFloor()) then Z = square:getZ() end;
-		
+	--local realplayer = getSpecificPlayer(0)
 	local Buddy = IsoPlayer.new(getWorld():getCell(),BuddyDesc,square:getX(),square:getY(),Z);
-	if(true) then
-		if(Buddy:isFemale()) then Buddy:setModel("kate.txt");
-		else Buddy:setModel("male.txt"); end
-	end
+	--IsoPlayer.setInstance(Buddy)
+	--Buddy:update()
+	--IsoPlayer.setInstance(realplayer)
 	
+	Buddy:setSceneCulled(false)
+	
+	--Buddy:dressInRandomOutfit()
+	--Buddy:dressInNamedOutfit(Buddy:getRandomDefaultOutfit())
 	Buddy:setBlockMovement(true)
+	Buddy:setNPC(true);
 
 	-- required perks ------------
 	for i=0, 4 do
@@ -389,13 +468,20 @@ function SuperSurvivor:spawnPlayer(square)
 	for i=0, 3 do
 		Buddy:LevelPerk(Perks.FromString("Lightfoot"));
 	end
+	for i=0, 2 do
+		Buddy:LevelPerk(Perks.FromString("Aiming")); -- counter act the fact they have to load now and fire at slower rate
+	end
 	-- end
 	
 	-- random perks -------------------
 	local level = ZombRand(9,14);
 	local count = 0;
 	while(count < level) do
-		Buddy:LevelPerk(Perks.FromString(getAPerk()));
+		local aperk = Perks.FromString(getAPerk())
+		if(aperk ~= nil) and (tostring(aperk) ~= "MAX") then 
+			--print("trying to level: ".. tostring(aperk))
+			Buddy:LevelPerk(aperk) 
+		end
 		count = count + 1;
 	end
 	--
@@ -411,9 +497,21 @@ function SuperSurvivor:spawnPlayer(square)
 	traits:add("IronGut")
 	traits:add("Lucky")
 	
-	Buddy:setTraits(traits) 
+	--Buddy:setTraits(traits) 
+	local result = ZombRand(1,100)
 	
-	Buddy:setClothingItem_Back(Buddy:getInventory():AddItem("Base.BigHikingBag"))
+	
+	if(result > 98) then		
+		Buddy:setClothingItem_Back(Buddy:getInventory():AddItem("Base.Bag_SurvivorBag"))
+	elseif(result > 94) then
+		Buddy:setClothingItem_Back(Buddy:getInventory():AddItem("Base.Bag_ALICEpack"))
+	elseif(result < 30) then
+		if(ZombRand(2) == 1) then
+			Buddy:setClothingItem_Back(Buddy:getInventory():AddItem("Base.Bag_DuffelBag"))	
+		else
+			Buddy:setClothingItem_Back(Buddy:getInventory():AddItem("Base.Schoolbag"))
+		end
+	end
 	
 	-- achievements mod compatibility to stop errors--------
 	if(Buddy:getModData().ThingsIDropped == nil) then 
@@ -449,9 +547,10 @@ function SuperSurvivor:spawnPlayer(square)
 		namePrefix = getText("ContextMenu_SD_DoctorPrefix_Before") 
 		namePrefixAfter = getText("ContextMenu_SD_DoctorPrefix_After") 
 	end
-	if(Buddy:getPerkLevel(Perks.FromString("Aiming")) >= 3) then 
+	if(Buddy:getPerkLevel(Perks.FromString("Aiming")) >= 5) then 
 		namePrefix = getText("ContextMenu_SD_VeteranPrefix_Before") 
 		namePrefixAfter = getText("ContextMenu_SD_VeteranPrefix_After") 
+		
 	end
 	if(Buddy:getPerkLevel(Perks.FromString("Farming")) >= 3) then 
 		namePrefix = getText("ContextMenu_SD_FarmerPrefix_Before") 
@@ -482,7 +581,7 @@ function SuperSurvivor:spawnPlayer(square)
 	local desc = Buddy:getDescriptor()
 	desc:setForename(nameToSet)
 	desc:setSurname("")	
-	
+	print("new SS:" .. tostring(Buddy:getBodyDamage():isInfected()))
 	return Buddy
 
 end
@@ -525,23 +624,30 @@ function SuperSurvivor:getGroupID()
 	return self.player:getModData().Group
 end
 
+function SuperSurvivor:setSneaking(toValue)
+	self.player:setSneaking(toValue)
+end
 
 function SuperSurvivor:setRunning(toValue)
-	if(self.player.setForceOverrideAnim ~= nil) then self.player:setForceOverrideAnim(toValue) end
-	local phi = self.player:getPrimaryHandItem()
-	if(phi ~= nil) and (instanceof(phi,"HandWeapon") and (phi.getRunAnim ~= nil) ) then self.player:getModData().RunAnim = phi:getRunAnim() 
-	else self.player:getModData().RunAnim = nil end
+
+	if(self.player:NPCGetRunning() ~= toValue) then
+	self.player:NPCSetRunning(toValue)
+	--self.player:setNPC(true)
+	--print("setRunning "..tostring(toValue))
+	--self.player:setPathfindRunning(toValue)
+	--self.player:setForceRun(toValue)
+	--self.player:setRunning(toValue)
+	self.player:NPCSetJustMoved(toValue)
+	--self.player:getModData().Running = toValue;
+	--self.player:getModData().bWalking = toValue;
+	end
 	
-	self.player:getModData().Running = toValue
 end
 function SuperSurvivor:getRunning()
 	return self.player:getModData().Running
 end
 
-function SuperSurvivor:setSneaking(toValue)
-	if(self.player.setForceOverrideAnim ~= nil) then self.player:setForceOverrideAnim(toValue)  end
-	self.player:getModData().Sneaking = toValue
-end
+
 function SuperSurvivor:getSneaking()
 	return self.player:getModData().Sneaking
 end
@@ -561,12 +667,14 @@ function SuperSurvivor:getCurrentTask()
 end
 function SuperSurvivor:isTooScaredToFight()
 	
-	if(self.EnemiesOnMe >= 2) or (self:HasInjury()) then 
+	if(self.EnemiesOnMe >= 3) or (self:HasMultipleInjury()) then 
 		return true
 	else
-		local base = 1
+		local base = 2
 		if(self:hasWeapon()) then base = base + 1 end
 		if(self:usingGun()) then base = base + 2 end
+		base = base - self.EnemiesOnMe;
+		if(self:HasInjury()) then base = base - 1 end
 		base = base + self:getBravePoints() + self:getGroupBraveryBonus()
 		--self:Speak(tostring(self.dangerSeenCount)..":"..tostring(base))
 		return (self.dangerSeenCount > (base)) 
@@ -626,7 +734,7 @@ end
 function SuperSurvivor:needToFollow()
 
 	local Task = self:getTaskManager():getTask()
-	if(Task ~= nil) then 
+	if(Task) then 
 		
 		if(Task.Name == "Follow" and Task:needToFollow() ) then 
 			
@@ -714,13 +822,7 @@ function SuperSurvivor:getFood()
 	else return nil end
 end
 
-function SuperSurvivor:getWeapon()	
-	local inv = self.player:getInventory()
-	local bag = self:getBag()
-	if inv:FindAndReturnCategory("Weapon") ~= nil then return inv:FindAndReturnCategory("Weapon")
-	elseif (inv ~= bag) and (bag:FindAndReturnCategory("Weapon") ~= nil) then return bag:FindAndReturnCategory("Weapon")
-	else return nil end
-end
+
 
 function SuperSurvivor:hasWater()	
 	local inv = self.player:getInventory()
@@ -746,6 +848,11 @@ function SuperSurvivor:getFacingSquare()
 end
 
 function SuperSurvivor:isTargetBuildingDangerous()
+
+	if(SafeBase) then -- if safe base mode on survivors consider other claimed buildings dangerous
+		local tempsquare = getRandomBuildingSquare(self.TargetBuilding)
+		if(SSGM:GetGroupIdFromSquare(tempsquare) ~= self:getGroupID()) then return true end
+	end
 
 	local result = NumberOfZombiesInOrAroundBuilding(self.TargetBuilding)
 	
@@ -797,14 +904,12 @@ end
 function SuperSurvivor:Speak(text)
 
 	if(SpeakEnabled) then
+	
+		--print(self:getName()..": "..text)
+		self.SayLine1 = text
+		self.JustSpoke = true
+		self.TicksSinceSpoke = 0
 		
-		if(self.player.setVehicle4TestCollision ~= nil) then
-			self.SayLine1 = text
-			self.JustSpoke = true
-			self.TicksSinceSpoke = 0
-		else
-			self.player:Say(tostring(self:getName())..": "..tostring(text))
-		end
 	end
 end
 
@@ -906,22 +1011,7 @@ function SuperSurvivor:getWalkToAttempt(sq)
 	return 0
 end
 
-function SuperSurvivor:updateTime()
-		self:renderName()
-	self.Reducer = self.Reducer + 1 
-	if(self.TriggerHeldDown) then 
-		--self.player:AttemptAttack() 
-		self:Attack(self.LastEnemeySeen)
-	end
-	if(self.Reducer % 30 == 0) then 
-		if(self.WaitTicks == 0) then
-			return true
-		else
-			self.WaitTicks = self.WaitTicks - 1
-			return false
-		end
-	else return false end
-end
+
 
 function SuperSurvivor:inUnLootedBuilding()
 	
@@ -1025,6 +1115,7 @@ function SuperSurvivor:isEnemy(character)
 		-- zombie is enemy to anyone
 		if character:isZombie() then return true 
 		elseif (self:isInGroup(character)) then return false
+		elseif (self.player:getModData().isHostile ~= true and self.player:getModData().surender == true) then return false -- so other npcs dont attack anyone surendering
 		elseif (self.player:getModData().hitByCharacter == true) and (character:getModData().semiHostile == true) then return true 
 		elseif (character:getModData().isHostile ~= self.player:getModData().isHostile) then 
 			--print(tostring(character:getForname()).."("..tostring(character:getModData().Group)..") is enemy to "..self:getName().."("..tostring(self:getGroupID()))
@@ -1058,7 +1149,15 @@ function SuperSurvivor:getBag()
 	
 	return self.player:getInventory()
 end
-
+--[[
+function SuperSurvivor:getWeapon()	
+	local inv = self.player:getInventory()
+	local bag = self:getBag()
+	if inv:FindAndReturnCategory("Weapon") ~= nil then return inv:FindAndReturnCategory("Weapon")
+	elseif (inv ~= bag) and (bag:FindAndReturnCategory("Weapon") ~= nil) then return bag:FindAndReturnCategory("Weapon")
+	else return nil end
+end
+]]
 function SuperSurvivor:getWeapon()
 
 	if(self.player:getInventory() ~= nil) and (self.player:getInventory():FindAndReturnCategory("Weapon")) then return self.player:getInventory():FindAndReturnCategory("Weapon") end
@@ -1123,9 +1222,19 @@ function SuperSurvivor:getAttackRange()
 	
 end
 
+function SuperSurvivor:RealCanSee(character)
+	
+	if(character:isZombie()) then return (self.player:CanSee(character)) end -- normal vision for zombies (they are not quiet or sneaky)
+	
+	local visioncone = SurvivorVisionCone
+	if(character:isSneaking()) then visioncone = visioncone - 0.15 end
+	return (self.player:CanSee(character) and (self.player:getDotWithForwardDirection(character:getX(),character:getY()) + visioncone) >= 1.0 ) 						
+
+end
+
 function SuperSurvivor:DoVision()
 
-	local atLeastThisClose = 15;
+	local atLeastThisClose = 19;
 	local spottedList = self.player:getCell():getObjectList()
 	local closestSoFar = 200
 	local closestSurvivorSoFar = 200
@@ -1144,12 +1253,14 @@ function SuperSurvivor:DoVision()
 	if(spottedList ~= nil) then
 		for i=0, spottedList:size()-1 do
 			local character = spottedList:get(i);
-			if(character ~= nil) and (character ~= self.player) and (character:isCharacter() or character:isZombie()) then
+			if(character ~= nil) and (character ~= self.player) and (instanceof(character,"IsoZombie") or instanceof(character,"IsoPlayer")) then
 			
 				if (character:isDead() == false) then
 					tempdistance = tonumber(getDistanceBetween(character,self.player))
 					
-					if( self:isEnemy(character) ) then							
+					if( self:isEnemy(character) ) then	
+					
+						local CanSee = self:RealCanSee(character)
 						
 						if(tempdistance < 1) and (character:getZ() == self.player:getZ()) then 
 							self.EnemiesOnMe = self.EnemiesOnMe + 1 
@@ -1158,17 +1269,17 @@ function SuperSurvivor:DoVision()
 							self.seenCount = self.seenCount + 1 
 						end
 						if(tempdistance < dangerRange) and (character:getZ() == self.player:getZ()) then
-							if((character:CanSee(self.player)) and (self:isInSameRoom(character))) or (tempdistance <= 1) then 
+							if (character:CanSee(self.player)) and (self:isInSameRoom(character) or (tempdistance <= 1)) then 
 								self.dangerSeenCount = self.dangerSeenCount + 1 
 							end 
 						end
-						if( (self.player:CanSee(character) or (tempdistance < 0.5)) and (tempdistance < closestSoFar) and (tempdistance <= atLeastThisClose) ) then
+						if( ( CanSee or (tempdistance < 0.5))  and (tempdistance < closestSoFar) and (tempdistance <= atLeastThisClose) ) then
 							closestSoFar = tempdistance ;
 							self.player:getModData().seenZombie = true;
 							closestNumber = i;							
 						end
 						
-					elseif (tempdistance < closestSurvivorSoFar) and (self.player:CanSee(character)) then
+					elseif( (tempdistance < closestSurvivorSoFar) and CanSee ) then
 						closestSurvivorSoFar = tempdistance
 						self.LastSurvivorSeen = character						
 					end
@@ -1196,13 +1307,23 @@ function SuperSurvivor:isOnScreen()
 end
 
 function SuperSurvivor:isInAction()
-	if(self.player:getModData().bWalking == true) then return true end
+
+	--if(self.player:isPerformingAnAction()) then return true end
+	--print(self:getName().." " .. tostring(self.TicksSinceSquareChanged))
+	if((self.player:getModData().bWalking == true) and (self.TicksSinceSquareChanged <= 3)) then
+		--print(self:getName().." returing true1")
+		return true 
+	end
 	
     local queue = ISTimedActionQueue.queues[self.player]
     if queue == nil then return false end
     for k,v in ipairs(queue.queue) do
-        if v then return true end
+        if v then 
+			--print(self:getName().." returing true2")
+			return true 
+		end
     end
+	
 	return false;
 		
 end
@@ -1223,9 +1344,10 @@ function SuperSurvivor:walkTo(square)
 
 
 	if(square == nil) then return false end
-	
+	--ISTimedActionQueue.add(ISWalkToTimedAction:new (self.player, square))
+	--self:setRunning(true)
 	--self.player:StopAllActionQueue()
-
+	
 	local parent
 	if(instanceof(square,"IsoObject")) then parent = square:getSquare() 
 	else parent = square end
@@ -1241,7 +1363,7 @@ function SuperSurvivor:walkTo(square)
 		self:WalkToAttempt(square)
 		self:WalkToPoint(adjacent:getX(),adjacent:getY(),adjacent:getZ())
 	end
-	
+	--]]
 end
 
 function SuperSurvivor:walkTowards(x,y,z)
@@ -1265,6 +1387,9 @@ function SuperSurvivor:setHostile(toValue)
 		self.userName:setOutlineColors(0,0, 0,255);	
 	end
 	self.player:getModData().isHostile = toValue
+	if(ZombRand(2) == 1) then 
+		self.player:getModData().isRobber = true
+	end
 end
 
 function SuperSurvivor:walkToDirect(square)
@@ -1285,7 +1410,7 @@ function SuperSurvivor:WalkToPoint(tx, ty, tz)
 		
         self.player:setPath2(nil);
         self.player:getPathFindBehavior2():pathToLocation(tx,ty,tz);
-		
+		if(self.DebugMode) then print(self:getName() .. " WalkToPoint") end
     end
         
   end
@@ -1332,24 +1457,62 @@ function SuperSurvivor:inFrontOfWindow()
 end
 
 
+function SuperSurvivor:updateTime()
+		self:renderName()
+		self.Reducer = self.Reducer + 1 
+	
+	if(self.Reducer % 20 == 0) then 
+		if(self.WaitTicks == 0) then
+			return true
+		else
+			self.WaitTicks = self.WaitTicks - 1
+			return false
+		end
+	else return false end
+end
+
 
 
 function SuperSurvivor:update()
 	
-	if(self:isDead()) then return false end
+	if(self:isDead()) then 
+		
+		return false
 	
-	self.TriggerHeldDown = false
-	if(not SurvivorHunger) then
-		self.player:getStats():setThirst(0.0)
-		self.player:getStats():setHunger(0.0)	
-	else
-		self.player:getStats():setThirst(self.player:getStats():getThirst() + 0.00005) -- survivor thirst does not move so manually incremnt it
 	end
 	
-	self.player:getBodyDamage():setWetness(0.0);	
+	self.player:setBlockMovement(true)
+	
+	self:CleanUp(0.988); -- slowly reduces current blood/dirt by this percent 
+	
+	self.TriggerHeldDown = false
+	if(not SurvivorHunger) then		
+		self.player:getStats():setThirst(0.0)
+		self.player:getStats():setHunger(0.0)	
+	--else
+		--self.player:getStats():setThirst(self.player:getStats():getThirst() + 0.00005) -- survivor thirst does not move so manually incremnt it
+	end
+	
+	--control of unmanaged stats
+	self.player:getNutrition():setWeight(85);
+	self.player:getBodyDamage():setWetness(0.0);
+	self.player:getBodyDamage():setSneezeCoughActive(0);	
+	self.player:getBodyDamage():setFoodSicknessLevel(0);	
+	self.player:getBodyDamage():setPoisonLevel(0);	
+	self.player:getBodyDamage():setUnhappynessLevel(0);		
+	self.player:getBodyDamage():setHasACold(false);		
 	self.player:getStats():setFatigue(0.0);	
 	self.player:getStats():setBoredom(0.0);
-	self.player:getStats():setMorale(0.0);
+	self.player:getStats():setIdleboredom(0.0);
+	self.player:getStats():setMorale(0.5);
+	self.player:getStats():setStress(0.0);
+	self.player:getStats():setSanity(1);
+	
+	
+	if(self.player:isOnFire()) then 
+		self.player:getBodyDamage():RestoreToFullHealth() -- temporarily give some fireproofing as they walk right through fire via pathfinding
+		self.player:setFireSpreadProbability(0); -- give some fireproofing as they walk right through fire via pathfinding	
+	end
 	
 
 	local cs = self.player:getCurrentSquare()
@@ -1372,25 +1535,38 @@ function SuperSurvivor:update()
 	--self.player:Say(tostring(self:isInAction()) ..",".. tostring(self.TicksSinceSquareChanged > 6) ..",".. tostring((self:inFrontOfWindow())))
 	
 	if (self.TicksSinceSquareChanged > 9) and (self:isInAction() == false) and (self:inFrontOfWindow()) and (self:getCurrentTask() ~= "Enter New Building") then
-		self.player:setBlockMovement(false)
 		self.player:climbThroughWindow(self:inFrontOfWindow())
-		self.player:setBlockMovement(true)
 		self.TicksSinceSquareChanged = 0
 	end
 	
-	
-	
+	if ((self.TicksSinceSquareChanged > 7) and (self:Get():getModData().bWalking == true)) then
+		print("detected survivor stuck walking: " .. self:getName());
+		local xoff = self.player:getX() + ZombRand(-3,3)
+		local yoff = self.player:getY() + ZombRand(-3,3)		
+		self:StopWalk()
+		self:WalkToPoint(xoff,yoff,self.player:getZ())
+		self:Wait(2)		
+	elseif ((self.TicksSinceSquareChanged > 10) and (self:Get():getModData().bWalking == true)) then
+		print("trying to knock survivor out of frozen state: " .. self:getName());
+		ISTimedActionQueue.add(ISGetHitFromBehindAction:new(self.player,getSpecificPlayer(0)))
+	end
 		
+	
 	self:DoVision()
 	--self:Speak(tostring(self:isInBase()))
 	
 	self.MyTaskManager:update()
-	if(self.Reducer % 480 == 0) then 
 	
+	if(self.Reducer % 480 == 0) then 
+		if(DebugMode) then print(self:getName().." task:"..MyTaskManager:getCurrentTask()) end
+		self:setSneaking(false)
+		
+		self.player:setNPC(true)
+		
 		local group = self:getGroup()
 		if(group) then group:checkMember(self:getID()) end
 		self:SaveSurvivor()
-		if(self:Get():getPrimaryHandItem() ~= nil) and (self:Get():getPrimaryHandItem():getDisplayName()=="Corpse") and (self:getCurrentTask() ~= "Pile Corpses") then
+		if(self:Get():getPrimaryHandItem() ~= nil) and (((self:Get():getPrimaryHandItem():getDisplayName()=="Corpse") and (self:getCurrentTask() ~= "Pile Corpses")) or (self:Get():getPrimaryHandItem():isBroken()) ) then
 			
 			ISTimedActionQueue.add(ISDropItemAction:new(self:Get(),self:Get():getPrimaryHandItem(),30))
 			self:Get():setPrimaryHandItem(nil)
@@ -1400,8 +1576,103 @@ function SuperSurvivor:update()
 		
 		self:ManageXP()
 		
+		self.player:getModData().hitByCharacter = false
+		self.player:getModData().semiHostile = false	
+		self.player:getModData().felldown = nil	
+		
 	else self:SaveSurvivorOnMap() end
+	
+	if( self.GoFindThisCounter > 0 ) then self.GoFindThisCounter = self.GoFindThisCounter -1 end
+	
+	
+end
 
+
+function SuperSurvivor:OnDeath()
+	print(self:getName() .. " has died")
+	local ID = self:getID()
+	SSM:OnDeath(ID)
+	
+	SurvivorLocX[ID] = nil
+	SurvivorLocY[ID] = nil
+	SurvivorLocZ[ID] = nil
+	if(self.player:getModData().LastSquareSaveX ~= nil) then
+		local lastkey = self.player:getModData().LastSquareSaveX .. self.player:getModData().LastSquareSaveY .. self.player:getModData().LastSquareSaveZ
+		if(lastkey) and ( SurvivorMap[lastkey] ~= nil ) then
+			table.remove(SurvivorMap[lastkey] , ID)
+		end 
+	end
+end
+
+function SuperSurvivor:PlayerUpdate()
+
+	if(not self.player:isLocalPlayer()) then
+	
+		if(self.TriggerHeldDown) then -- simulate automatic weapon fire
+			self:Attack(self.LastEnemeySeen)
+		end
+		
+		if(self.player:getLastSquare() ~= nil ) then
+			local cs = self.player:getCurrentSquare()
+			local ls = self.player:getLastSquare()
+			local tempdoor = ls:getDoorTo(cs);
+			if(tempdoor ~= nil and tempdoor:IsOpen() ) then
+				 tempdoor:ToggleDoor(self.player);
+				
+			end		
+		end
+		
+		self:WalkToUpdate(self.player)
+		
+	end
+	
+end
+
+function SuperSurvivor:WalkToUpdate()
+    
+	
+    if(self.player:getModData().bWalking) then
+					
+        local myBehaviorResult = self.player:getPathFindBehavior2():update() 
+		
+      -- if(player:isSpeaking() == false) then player:Say(tostring(myBehaviorResult)) end
+        if((myBehaviorResult == BehaviorResult.Failed) or (myBehaviorResult == BehaviorResult.Succeeded)) then   
+		
+            self:StopWalk()
+		elseif (myBehaviorResult ~= BehaviorResult.Working) then
+			print(tostring(myBehaviorResult));
+        end
+  
+   end
+   
+   --]]
+end
+
+function SuperSurvivor:StopWalk()
+	
+	--print(self:getName() .. " StopWalk");
+	ISTimedActionQueue.clear(self.player)
+	self.player:StopAllActionQueue()
+	self.player:setPath2(nil)
+	self.player:getModData().bWalking = false
+	self.player:getModData().Running = false
+	self:setRunning(false)
+	self.player:setSneaking(false)	
+	--self.player:clearVariables()
+	--self.player:setMoving(false)
+	--self.player:NPCSetRunning(false)
+	self.player:NPCSetJustMoved(false)
+	self.player:NPCSetAttack(false)
+	self.player:NPCSetMelee(false)
+	self.player:NPCSetAiming(false)
+	--self.player:setPerformingAnAction(false)
+	--self.player:setVariable("bPathfind", false)	
+	--self.player:setVariable("bKnockedDown", false)	
+	--self.player:setVariable("AttackAnim", false)
+	--self.player:setVariable("BumpFall", false)
+
+	--self.player:setVariable("IsPerformingAnAction", this::isPerformingAnAction, this::setPerformingAnAction);
+	
 end
 
 function SuperSurvivor:ManageXP()
@@ -1416,14 +1687,18 @@ function SuperSurvivor:ManageXP()
 			currentLevel = self.player:getPerkLevel(ThePerk)
 			currentXP = self.player:getXp():getXP(ThePerk)
 			XPforNextLevel = self.player:getXpForLevel(currentLevel+1)
+			local display_perk = PerkFactory.getPerkName(Perks.FromString(SurvivorPerks[i]))
+			--print(tostring(self:getName())..tostring(display_perk).." - "..tostring(currentXP).."/"..tostring(XPforNextLevel))
 			if(currentXP >= XPforNextLevel) and (currentLevel < 10) then 
 				self.player:LevelPerk(ThePerk)
-				local display_perk = PerkFactory.getPerkName(Perks.FromString(SurvivorPerks[i]))
+				
+				
 				if( string.match(SurvivorPerks[i], "Blade") ) or ( SurvivorPerks[i] == "Axe" ) then
 					display_perk = getText("IGUI_perks_Blade") .. " " .. display_perk
 				elseif( string.match(SurvivorPerks[i], "Blunt") ) then
 					display_perk = getText("IGUI_perks_Blunt") .. " " .. display_perk
 				end
+				
 				self:Speak(getText("ContextMenu_SD_PerkLeveledUp_Before")..tostring(display_perk)..getText("ContextMenu_SD_PerkLeveledUp_After"))
 			end
 			--if(SurvivorPerks[i] == "Aiming") then self.player:Say(tostring(currentXP).."/"..tostring(XPforNextLevel)) end
@@ -1435,7 +1710,23 @@ end
 function SuperSurvivor:getTaskManager()
 	return self.MyTaskManager	
 end
+function SuperSurvivor:HasMultipleInjury()
 
+	local bodyparts = self.player:getBodyDamage():getBodyParts()
+	local total = 0
+	for i=0, bodyparts:size()-1 do
+
+		local bp = bodyparts:get(i)
+		if(bp:HasInjury()) and (bp:bandaged() == false) then
+			total = total + 1
+			if(total > 1) then break end
+		end
+		
+	end
+	
+	return (total > 1)
+
+end
 function SuperSurvivor:HasInjury()
 
 	local bodyparts = self.player:getBodyDamage():getBodyParts()
@@ -1473,9 +1764,11 @@ function SuperSurvivor:delete()
 	self.player:getModData().ID = 0;
 	local filename = getSaveDir() .. "SurvivorTemp";
 	self.player:save(filename);
-	self.player:setX(9303);
-	self.player:setY(5709);
-	self.player:Despawn();
+	self.player:removeFromWorld()
+	self.player:removeFromSquare()
+	--self.player:setX(9303);
+	--self.player:setY(5709);
+	--self.player:Despawn();
 	self.player = nil;
 	--self.o = nil;
 	--self.TaskManager = nil
@@ -1493,7 +1786,12 @@ function SuperSurvivor:SaveSurvivorOnMap()
 		local y = math.floor(self.player:getY())
 		local z = math.floor(self.player:getZ())
 		local key = x .. y .. z
+		
 		if(not SurvivorMap[key]) then SurvivorMap[key] = {} end
+		
+		SurvivorLocX[ID] = x
+		SurvivorLocY[ID] = y
+		SurvivorLocZ[ID] = z
 		
 		if (has_value(SurvivorMap[key],ID) == false) then
 			
@@ -1528,7 +1826,7 @@ function SuperSurvivor:SaveSurvivor()
 		local filename = getSaveDir() .. "Survivor"..tostring(ID);
 		self.player:save(filename);
 		--print("saved survivor "..tostring(ID))
-		if(self.player ~= nil and self.player:isDead() == false and self.player:getCurrentState() ~= DieState.instance() ) then
+		if(self.player ~= nil and self.player:isDead() == false ) then
 			self:SaveSurvivorOnMap()		
 		else			
 			local group = self:getGroup()
@@ -1582,9 +1880,196 @@ function SuperSurvivor:FindClosestOutsideSquare(thisBuildingSquare)
 	return thisBuildingSquare
 end
 
+function SuperSurvivor:startReload()
+
+
+end
+
+function SuperSurvivor:ReadyGun(weapon)
+
+	if(not weapon) or (not weapon:isAimedFirearm()) then return true end
+	
+	if weapon:isJammed() then
+		weapon:setJammed(false)
+	end	
+	
+	if weapon:haveChamber() and not weapon:isRoundChambered() then
+		if(ISReloadWeaponAction.canRack(weapon)) then
+			ISReloadWeaponAction.OnPressRackButton(self.player, weapon)
+			print(self:getName().." needs to rack gun")
+			return true		
+		end	
+	end
+		
+	
+	if(weapon:getMagazineType()) then
+		if(weapon:isContainsClip() == false) then
+			print(self:getName().." gun needs a magazine0:"..tostring(weapon:getMagazineType()))
+			local magazine = weapon:getBestMagazine(self.player)
+			if(magazine == nil) then magazine = self.player:getInventory():getFirstTypeRecurse(weapon:getMagazineType()) end
+			if(magazine == nil) then 
+				print(self:getName().." needs to spawn magazine1:" .. tostring(weapon:getMagazineType()))
+				magazine = self.player:getInventory():AddItem(weapon:getMagazineType()); 
+			end
+			
+			if magazine then
+				local ammotype = magazine:getAmmoType();
+				if (not self.player:getInventory():containsWithModule(ammotype)) and 
+				(magazine:getCurrentAmmoCount()==0) and (SurvivorInfiniteAmmo) then
+					magazine:setCurrentAmmoCount(magazine:getMaxAmmo())
+				end
+				
+				print(self:getName().." trying to load magazine into gun")
+				ISTimedActionQueue.add(ISInsertMagazine:new(self.player, weapon, magazine))
+				ISReloadWeaponAction.ReloadBestMagazine(self.player, weapon)
+				return	true		
+			else
+				print(self:getName().." error trying to spawn mag for gun?")
+			end			
+		end
+		
+		
+		if weapon:isContainsClip() then
+			local magazine = weapon:getBestMagazine(self.player)
+			if(magazine == nil) then magazine = self.player:getInventory():getFirstTypeRecurse(weapon:getMagazineType()) end
+			if(magazine == nil) then 
+				print(self:getName().." needs to spawn magazine2:" .. tostring(weapon:getMagazineType()))
+				magazine = self.player:getInventory():AddItem(weapon:getMagazineType()); 
+			end
+			if(self:gunAmmoInInvCount(weapon) < 1) and (SurvivorInfiniteAmmo) then
+				
+				local maxammo = magazine:getMaxAmmo()
+				local amtype = magazine:getAmmoType()
+				print(self:getName().." needs to spawn "..tostring(maxammo).." x " .. tostring(amtype))
+				for i=0, maxammo do
+					local am = instanceItem(amtype)
+					self.player:getInventory():AddItem(am)
+				end
+			elseif(self:gunAmmoInInvCount(weapon) < 1) and (not ISReloadWeaponAction.canShoot(weapon)) and (not SurvivorInfiniteAmmo) then
+				print(self:getName().." no clip ammo left")
+				return false
+			end
+			
+			if(weapon:getCurrentAmmoCount() < weapon:getMaxAmmo()) then
+				ISTimedActionQueue.add(ISEjectMagazine:new(self.player, weapon))
+			
+				-- reload the ejected magazine and insert it
+				print(self:getName().." needs to reload the ejected magazine and insert it")
+				ISTimedActionQueue.queueActions(self.player, ISReloadWeaponAction.ReloadBestMagazine, weapon)
+				return true
+			else 
+				print(self:getName().." mag already full")				
+				return true
+			end
+		end
+		
+		local magazine = weapon:getBestMagazine(self.player)
+		if magazine then
+			ISInventoryPaneContextMenu.transferIfNeeded(self.player, magazine)
+			ISTimedActionQueue.add(ISInsertMagazine:new(self.player, weapon, magazine))
+			return true
+		end
+		-- check if we have an empty magazine for the current gun
+		ISReloadWeaponAction.ReloadBestMagazine(self.player, weapon)
+	else -- gun with no magazine
+			
+		if(self:gunAmmoInInvCount(weapon) < 1) and (SurvivorInfiniteAmmo) then
+			
+			local maxammo = weapon:getMaxAmmo()
+			local ammotype = weapon:getAmmoType()
+			--print(self:getName().." needs to spawn ammo type:" .. tostring(ammotype))
+			for i=0, maxammo do			
+				local am = instanceItem(ammotype)
+				self.player:getInventory():AddItem(am)
+			end
+		end
+		
+		-- if can't have more bullets, we don't do anything, this doesn't apply for magazine-type guns (you'll still remove the current clip)
+		if weapon:getCurrentAmmoCount() >= weapon:getMaxAmmo() then
+			--print(self:getName().." ammo already max")
+			return true
+		end
+		
+		local ammoCount = ISInventoryPaneContextMenu.transferBullets(self.player, weapon:getAmmoType(), weapon:getCurrentAmmoCount(), weapon:getMaxAmmo())
+		if ammoCount == 0 then
+			--print(self:getName().." no ammo")
+			if(not ISReloadWeaponAction.canShoot(weapon)) then
+				return false 
+			else
+				return true
+			end
+		end
+		ISTimedActionQueue.add(ISReloadWeaponAction:new(self.player, weapon))
+		return true
+	end
+	
+	if(not ISReloadWeaponAction.canShoot(weapon)) then
+		return false 
+	else
+		return true
+	end
+	
+	
+end
+function SuperSurvivor:needToReadyGun(weapon)
+	
+	if(weapon and self:usingGun() and not ISReloadWeaponAction.canShoot(weapon) ) then return true
+	else return false end
+	
+end
+
+function SuperSurvivor:gunAmmoInInvCount(gun)
+	local ammoType = gun:getAmmoType()
+	if ammoType then
+		local ammoCount = self.player:getInventory():getItemCountRecurse(ammoType)
+		--ammoCount = math.min(ammoCount, gun:getMaxAmmo() - gun:getCurrentAmmoCount())
+		--local bullets = self.player:getInventory():getSomeType(gun:getAmmoType(), ammoCount);
+		--if bullets and not bullets:isEmpty() then
+			--self.bullets = bullets;
+			--self.ammoCount = ammoCount;
+			--print(self:getName().." has " ..  tostring(ammoCount) .." x " .. tostring(ammoType))
+			return ammoCount
+		--end
+	end
+	return 0
+end
+
+function SuperSurvivor:needToReload()
+
+	local weapon = self.player:getPrimaryHandItem()
+	if(not weapon) then return false end
+	--print("needToReload");
+	--print( tostring(not self:isReloading()) .. "and" .. tostring( self:usingGun()).. "and" .. tostring(weapon:getAmmoType()) .. "and" .. tostring(weapon:getCurrentAmmoCount()) .. "<" .. tostring(weapon:getMaxAmmo()) ) 
+	if( not self:isReloading() and self:usingGun() and weapon:getAmmoType() and (weapon:getCurrentAmmoCount() < weapon:getMaxAmmo()) ) then return true
+	else return false end
+	
+end
+
+function SuperSurvivor:isReloading()
+	
+	--print(self:getName().." isReloading = ");
+    --local queue = ISTimedActionQueue.queues[self.player]
+    --if queue == nil then return false end
+    --for k,v in ipairs(queue.queue) do
+		--print("v:"..tostring(v))
+		--print("k:"..tostring(k))
+		--if(ISReloadWeaponAction == )
+		--if(v.canRack ~= nil)  then --  this current is a reloading TA
+		--	print("is reloading")
+		--	return true
+		--end
+		--v:lol()
+        --if v then return true end
+    --end
+	--print(self:getName().." isReloading end");
+	return self.player:getVariableBoolean("isLoading")
+		
+end
 
 
 function SuperSurvivor:giveWeapon(weaponType,equipIt )
+
+	if ((weaponType == "AssaultRifle") or (weaponType == "AssaultRifle2"))  then weaponType = "VarmintRifle" end -- temporarily disable assult rifles
 	
 	local weapon = self.player:getInventory():AddItem(weaponType);
 	if(weapon == nil) then return false end
@@ -1594,8 +2079,14 @@ function SuperSurvivor:giveWeapon(weaponType,equipIt )
 		self:setGunWep(weapon)
 	else self:setMeleWep(weapon) end
 	
+	if(weapon:getMagazineType()~=nil) then
+		self.player:getInventory():AddItem(weapon:getMagazineType());
+	end
 	
-	if(equipIt) then self.player:setPrimaryHandItem(weapon) end
+	if(equipIt) then 
+		self.player:setPrimaryHandItem(weapon) 
+		if(weapon:isRequiresEquippedBothHands() or weapon:isTwoHandWeapon()) then self.player:setSecondaryHandItem(weapon)  end
+	end
 	
 	
 	local ammotypes = getAmmoBullets(weapon,true);
@@ -1641,6 +2132,8 @@ function SuperSurvivor:FindAndReturn(thisType)
 end
 function SuperSurvivor:FindAndReturnCount(thisType)
 
+	if(thisType == nil) then return 0 end
+	
 	local count = 0
 	count = count + self.player:getInventory():getItemsFromType(thisType):size()
 
@@ -1657,12 +2150,9 @@ function SuperSurvivor:WeaponReady()
 	if(primary ~= nil) and (self.player ~= nil) and (instanceof(primary,"HandWeapon")) and (primary:isAimedFirearm()) then
 	
 		primary:setCondition(primary:getConditionMax())	
-			
-		if(SurvivorInfiniteAmmo) then 
-			primary:getModData().roundChambered = 1 ;
-			primary:getModData().currentCapacity = 1 ;
-			primary:getModData().isJammed = nil 
-		return true end
+		primary:setJammed(false);
+		primary:getModData().isJammed = nil 
+		
 		
 		local ammo, ammoBox, result;
 		
@@ -1676,6 +2166,9 @@ function SuperSurvivor:WeaponReady()
 		for i=1, #self.AmmoTypes do	
 			ammo = self:FindAndReturn(self.AmmoTypes[i])
 			if(ammo) then break end
+		end
+		if(not ammo) and (SurvivorInfiniteAmmo) then 
+			ammo = self.player:getInventory():AddItem(self.AmmoTypes[1])
 		end
 		
 		if(not ammo) then
@@ -1723,17 +2216,8 @@ function SuperSurvivor:WeaponReady()
 			
 		end
 		
-		if(ammo) then
-			
-			primary:getModData().roundChambered = 1
-			primary:getModData().currentCapacity = 1 ;
-			primary:getModData().isJammed = nil 
-			self.roundChambered = ammo
-			return true
-			
-		end
-		
-		return false
+		if(not ISReloadWeaponAction.canShoot(primary)) then return self:ReadyGun(primary) 
+		else return true end
 		
 	end
 	
@@ -1770,8 +2254,9 @@ end
 function SuperSurvivor:reEquipGun()
 	
 	if(self.LastGunUsed == nil) then return false end
-		
+	if(self.player:getPrimaryHandItem() ~= nil and self.player:getPrimaryHandItem():isTwoHandWeapon()) then self.player:setSecondaryHandItem(nil) end 
 	self.player:setPrimaryHandItem(self.LastGunUsed)
+	if(self.LastGunUsed:isTwoHandWeapon()) then self.player:setSecondaryHandItem(self.LastGunUsed) end
 	
 	return true
 	
@@ -1779,8 +2264,9 @@ end
 function SuperSurvivor:reEquipMele()
 	
 	if(self.LastMeleUsed == nil) then return false end
-		
+	if(self.player:getPrimaryHandItem() ~= nil and self.player:getPrimaryHandItem():isTwoHandWeapon()) then self.player:setSecondaryHandItem(nil) end
 	self.player:setPrimaryHandItem(self.LastMeleUsed)
+	if(self.LastMeleUsed:isTwoHandWeapon()) then self.player:setSecondaryHandItem(self.LastMeleUsed) end
 	
 	return true
 	
@@ -1791,6 +2277,7 @@ function SuperSurvivor:setMeleWep(handWeapon)
 	self:Get():getModData().meleWeapon = handWeapon:getType()
 	self.LastMeleUsed = handWeapon
 	
+	
 end
 
 function SuperSurvivor:setGunWep(handWeapon)
@@ -1800,8 +2287,19 @@ function SuperSurvivor:setGunWep(handWeapon)
 	
 end
 
+function SuperSurvivor:getMinWeaponRange()
+	local out = 0.5
+	if(self.player:getPrimaryHandItem() ~= nil) then
+		if(instanceof(self.player:getPrimaryHandItem(),"HandWeapon")) then
+			return self.player:getPrimaryHandItem():getMinRange()
+		end
+	end
+	return out
+end
+
 function SuperSurvivor:Attack(victim)
 	--if(self.player:getCurrentState() == SwipeStatePlayer.instance()) then return false end -- already attacking wait
+	if(self.player:getModData().felldown) then return false end -- cant attack if stunned by an attack
 	
 	if not (instanceof(victim,"IsoPlayer") or instanceof(victim,"IsoZombie")) then return false end
 	if(self:WeaponReady()) then
@@ -1810,10 +2308,32 @@ function SuperSurvivor:Attack(victim)
 			SurvivorTogglePVP();
 		end
 		
-		StopWalk(self.player)
+		--print(self:getName().."t walking2")
+		self:StopWalk()
 		self.player:faceThisObject(victim);
+		
 		if(self.UsingFullAuto) then self.TriggerHeldDown = true end
-		if(self.player ~= nil) then self.player:AttemptAttack() end
+		if(self.player ~= nil) then 
+			local distance = getDistanceBetween(self.player,victim)
+			local minrange = self:getMinWeaponRange() + 0.1
+			--print("distance was ".. tostring(distance))
+			if(distance < minrange) or (self.player:getPrimaryHandItem() == nil) then
+				--self:Speak("Shove!"..tostring(distance).."/"..tostring(minrange))
+				self.player:setForceShove(true);
+				self.player:setVariable("bShoveAiming", true);
+				self.player:setVariable("bDoShove", true);
+				self.player:setVariable("meleePressed", true);
+				self.player:pressedAttack();
+				self.player:NPCSetAttack(true);
+				self.player:NPCSetMelee(true);  
+				self.player:AttemptAttack(10.0);
+			else
+				--self:Speak("Attack!"..tostring(distance).."/"..tostring(minrange))
+				self.player:NPCSetAttack(true);
+				self.player:NPCSetMelee(false);
+			end
+			
+		end
 	else
 		local pwep = self.player:getPrimaryHandItem()
 		local pwepContainer = pwep:getContainer()
@@ -1830,14 +2350,19 @@ function SuperSurvivor:Attack(victim)
 		self:setNeedAmmo(true)	
 	
 		local mele = self:FindAndReturn(self.player:getModData().weaponmele);
-		if(mele) then self.player:setPrimaryHandItem(mele) 
+		if(mele) then 
+			self.player:setPrimaryHandItem(mele) 
+			if(mele:isRequiresEquippedBothHands()) then self.player:setSecondaryHandItem(mele) end
 		else
 			local bwep = self.player:getInventory():getBestWeapon();
-			if(bwep) and (bwep ~= pwep) then self.player:setPrimaryHandItem(bwep) ;
+			if(bwep) and (bwep ~= pwep) then 
+				self.player:setPrimaryHandItem(bwep) ;
+				if(bwep:isRequiresEquippedBothHands()) then self.player:setSecondaryHandItem(bwep) end
 			else 
 				bwep = self:getWeapon()
 				if(bwep) then
 					self.player:setPrimaryHandItem(bwep) ;
+					if(bwep:isRequiresEquippedBothHands()) then self.player:setSecondaryHandItem(bwep) end
 				else
 					
 					self.player:setPrimaryHandItem(nil) 
@@ -1877,7 +2402,7 @@ function SuperSurvivor:findNearestSheetRopeSquare(down)
 		
 		for x=minx, maxx do
 			for y=miny, maxy do
-				sq = getCell():getOrCreateGridSquare(x,y,self.player:getZ());
+				sq = getCell():getGridSquare(x,y,self.player:getZ());
 				if(sq ~= nil) then
 					local distance = getDistanceBetween(sq,self.player)
 				
@@ -1903,20 +2428,23 @@ function SuperSurvivor:isAmmoForMe(itemType)
 			if(itemType == self.AmmoTypes[i]) then return true end
 		end	
 	end
-	if(self.AmmoTypesBox) and (#self.AmmoTypesBox > 0) then		
-		for i=1, #self.AmmoTypesBox do		
-			if(itemType == self.AmmoTypesBox[i]) then return true end
+	if(self.AmmoBoxTypes) and (#self.AmmoBoxTypes > 0) then		
+		for i=1, #self.AmmoBoxTypes do		
+			if(itemType == self.AmmoBoxTypes[i]) then return true end
 		end	
 	end
-		
+		-- AmmoTypesBox
 	return false
 
 end
 
 function SuperSurvivor:FindThisNearBy(itemType, TypeOrCategory)
 				
+	if(self.GoFindThisCounter > 0) then return nil end
+	
+	self.GoFindThisCounter = 10;
 	local sq, itemtoReturn;
-		local range = 42
+		local range = 30
 		local minx=math.floor(self.player:getX() - range);
 		local maxx=math.floor(self.player:getX() + range);
 		local miny=math.floor(self.player:getY() - range);
@@ -1931,7 +2459,7 @@ function SuperSurvivor:FindThisNearBy(itemType, TypeOrCategory)
 		for z=zhigh, 0, -1 do
 			for x=minx, maxx do
 				for y=miny, maxy do
-					sq = getCell():getOrCreateGridSquare(x,y,z);
+					sq = getCell():getGridSquare(x,y,z);
 					if(sq ~= nil) then
 						local tempDistance = getDistanceBetween(sq,self.player)
 						if (self.player:getZ() ~= z) then tempDistance = tempDistance + 10 end
@@ -2013,15 +2541,239 @@ end
 
 function SuperSurvivor:getUnEquipedArmors()
 
-	if(GlobalArmor == nil) then return nil end
 	local armors = {}
 	local inv = self.player:getInventory()
 	local items = inv:getItems()
 	
 	for i=1, items:size()-1 do
 		local item = items:get(i)
-		if(GlobalArmor) and item ~= nil and GlobalArmor[item:getType()] ~= nil and ArmorisArmorEquipped(getSpecificPlayer(0),item) == false then table.insert(armors,item) end
+		if item ~= nil then print ("checking: "..tostring(item:getDisplayName()) .. "/" .. tostring(item:getCategory()) .. "/" .. tostring(item:isEquipped())) end
+		if item ~= nil and ((item:getCategory() == "Clothing") or (item:getCategory() == "Container" and item:getWeight() > 0) ) and item:isEquipped() == false then 
+			table.insert(armors,item) 
+			--print("added "..item:getDisplayName() .. " to table")
+			--getSpecificPlayer(0):Say("added "..item:getDisplayName() .. " to table")
+		end
 	end
 
 	return armors
+end
+
+
+function SuperSurvivor:SuitUp(SuitName)
+		print("Suiting up with:"..SuitName)
+		self.player:setWornItem("Jacket", nil);
+		--Suits = {}
+		--Suits["Army"] = {"Base.Hat_BeretArmy","Base.Jacket_CoatArmy","Base.Trousers_ArmyService","Base.Shoes_ArmyBoots"}
+		--Suits["Gangster"] = {"Base.Hat_BaseballCapGreen_Reverse","Base.Trousers_JeanBaggy","Base.Shoes_RedTrainers"}
+		
+		if(SuitName == "Army") then
+			self:WearThis("Base.Hat_BeretArmy");
+			self:WearThis("Base.Jacket_CoatArmy");
+			self:WearThis("Base.Trousers_ArmyService");
+			self:WearThis("Base.Shoes_ArmyBoots");
+		elseif(SuitName == "Gangster") then
+			local result = ZombRand(3)
+			if(result == 1) then self:WearThis("Base.HoodieUP_WhiteTINT");
+			elseif(result == 2) then self:WearThis("Base.HoodieDOWN_WhiteTINT");
+			else self:WearThis("Base.Hat_BaseballCapGreen_Reverse") end
+			self:WearThis("Base.Trousers_JeanBaggy");
+			self:WearThis("Base.Shoes_RedTrainers");
+		elseif(SuitName == "Survivalist") then
+			self:WearThis("Base.Ghillie_Top");
+			self:WearThis("Base.Ghillie_Trousers");
+			self:WearThis("Base.Shoes_BlackBoots");
+		elseif(SuitName == "Hunter") then
+			self:WearThis("Base.Hat_BonnieHat_CamoGreen");
+			self:WearThis("Base.Vest_Hunting_Camo");
+			self:WearThis("Base.Trousers_CamoGreen");
+			self:WearThis("Base.Shoes_BlackBoots");
+		elseif(SuitName == "ArmyCamo") then
+			self:WearThis("Base.Hat_Army");
+			self:WearThis("Base.Shirt_CamoGreen");
+			self:WearThis("Base.Trousers_CamoGreen");
+			self:WearThis("Base.Shoes_ArmyBoots");
+		elseif(SuitName == "Chef") then
+			self:WearThis("Base.Hat_ChefHat");
+			self:WearThis("Base.Jacket_Chef");
+			self:WearThis("Base.Trousers_Chef");
+			self:WearThis("Base.Shoes_Black");
+		elseif(SuitName == "Fireman") then
+			self:WearThis("Base.Hat_Fireman");
+			self:WearThis("Base.Jacket_Fireman");
+			self:WearThis("Base.Trousers_Fireman");
+			self:WearThis("Base.Shoes_BlackBoots");
+		elseif(SuitName == "Doctor") then
+			self:WearThis("Base.Hat_SurgicalCap_Blue");
+			self:WearThis("Base.JacketLong_Doctor");
+			self:WearThis("Base.Trousers_Scrubs");
+			self:WearThis("Base.Shoes_Black");
+		elseif(SuitName == "Police") then
+			self:WearThis("Base.Hat_Police_Grey");
+			self:WearThis("Base.Jacket_Police");
+			self:WearThis("Base.Trousers_PoliceGrey");
+			self:WearThis("Base.Shoes_BlackBoots");
+		elseif(SuitName == "Farmer") then
+			--self:WearThis("Base.Hat_Police_Grey");
+			self:WearThis("Base.Boilersuit");
+			self:WearThis("Base.Dungarees");
+			self:WearThis("Base.Shoes_BlackBoots");
+		elseif(SuitName == "Guard") then
+			self:WearThis("Base.Shirt_PrisonGuard");
+			self:WearThis("Base.Trousers_PrisonGuard");
+			self:WearThis("Base.Shoes_BlackBoots");
+		elseif(SuitName == "Formal") then
+			self:WearThis("Base.Shirt_FormalWhite");
+			self:WearThis("Base.Trousers_WhiteTEXTURE");
+			self:WearThis("Base.Shoes_Black");
+		elseif(SuitName == "Spiffo") then
+			self:WearThis("Base.SpiffoSuit");
+			self:WearThis("Base.Hat_Spiffo");
+			self:WearThis("Base.SpiffoTail");
+		elseif(SuitName == "Santa") then
+			self:WearThis("Base.Hat_SantaHat");
+			self:WearThis("Base.JacketLong_Santa");
+			self:WearThis("Base.Trousers_Santa");
+			self:WearThis("Base.Shoes_BlackBoots");
+		elseif(SuitName == "Hazmat") then
+			self:WearThis("Base.Shoes_BlackBoots");
+			self:WearThis("Base.HazmatSuit");					
+		elseif(SuitName == "Leader") then
+			self:WearThis("Base.Vest_BulletPolice");
+			self:WearThis("Base.Shirt_Lumberjack");					
+			self:WearThis("Base.Trousers_DefaultTEXTURE");					
+			self:WearThis("Base.Shoes_Black");
+		elseif(SuitName == "Worker") then
+			self:WearThis("Base.Hat_HardHatYellow");
+			self:WearThis("Base.Shirt_Workman");					
+			self:WearThis("Base.Trousers_DefaultTEXTURE");					
+			self:WearThis("Base.Shoes_BlackBoots");
+		else -- random basic clothes
+			
+			getRandomSurvivorSuit(self)
+			--[[
+			local result = ZombRand(6)
+			if(result == 0) then
+			self:WearThis("Base.Hat_BaseballCapBlue");
+			self:WearThis("Base.Shirt_HawaiianRed");
+			self:WearThis("Base.TrousersMesh_DenimLight");
+			self:WearThis("Base.Shoes_Black");
+			elseif(result == 1) then
+			self:WearThis("Base.Hat_BaseballCapGreen");
+			self:WearThis("Base.Shirt_HawaiianTINT");
+			self:WearThis("Base.TrousersMesh_DenimLight");
+			self:WearThis("Base.Shoes_Black");
+			elseif(result == 2) then
+			self:WearThis("Base.Hat_BaseballCapGreen");
+			self:WearThis("Base.Shirt_HawaiianTINT");
+			self:WearThis("Base.TrousersMesh_DenimLight");
+			self:WearThis("Base.Shoes_Black");
+			elseif(result == 3) then
+			self:WearThis("Base.Tshirt_BusinessSpiffo");
+			self:WearThis("Base.TrousersMesh_DenimLight");
+			self:WearThis("Base.Shoes_Black");
+			elseif(result == 4) then
+			--self:WearThis("Base.Hat_BaseballCapGreen");
+			self:WearThis("Base.Tshirt_PileOCrepe");
+			self:WearThis("Base.TrousersMesh_DenimLight");
+			self:WearThis("Base.Shoes_Black");
+			else
+			--self:WearThis("Base.Hat_BaseballCapGreen");
+			self:WearThis("Base.Tshirt_McCoys");
+			self:WearThis("Base.Trousers_DefaultTEXTURE_HUE");
+			self:WearThis("Base.Shoes_Black");
+			end
+			]]
+			
+			
+		end
+end
+
+
+
+
+
+
+function SuperSurvivor:CleanUp(percent)
+
+
+	for i=0, BloodBodyPartType.MAX:index()-1 do
+		
+		local currentblood = self.player:getVisual():getBlood(BloodBodyPartType.FromIndex(i));
+		self.player:getVisual():setBlood(BloodBodyPartType.FromIndex(i), (currentblood * percent)); -- always cut 10% off current amount 
+	end
+	
+	local washList = {}
+		if (self.player:getClothingItem_Feet() ~= nil) then
+		
+			table.insert(washList,self.player:getClothingItem_Feet())
+		end
+		if (self.player:getClothingItem_Hands() ~= nil) then
+		
+			table.insert(washList,self.player:getClothingItem_Hands())
+		end
+		if (self.player:getClothingItem_Head() ~= nil) then
+		
+			table.insert(washList,self.player:getClothingItem_Head())
+		end
+		if (self.player:getClothingItem_Legs() ~= nil) then
+		
+			table.insert(washList,self.player:getClothingItem_Legs())
+		end
+		if (self.player:getClothingItem_Torso() ~= nil) then
+		
+			table.insert(washList,self.player:getClothingItem_Torso())
+		end
+		if (self.player:getWornItem("Jacket") ~= nil) then
+		
+			table.insert(washList,self.player:getWornItem("Jacket"))
+		end
+		
+
+	for i,item in ipairs(washList) do
+		--print("wash loop: "..tostring(item))
+		
+		local blood
+		if instanceof(item, "Clothing") then
+			if BloodClothingType.getCoveredParts(item:getBloodClothingType()) then
+                local coveredParts = BloodClothingType.getCoveredParts(item:getBloodClothingType())
+				if(coveredParts ~= nil) then
+					for j=0, coveredParts:size()-1 do
+						local part = coveredParts:get(j);
+						if(part ~= nil) then
+							blood = item:getBlood(part);
+							item:setBlood(part, (blood * percent));
+						else
+							print("coveredParts(j) was nil")
+						end
+						
+					end
+				else
+					print("BloodClothingType.getCoveredParts was nil")
+				end
+			end
+			
+			local dirty = item:getDirtyness();
+			item:setDirtyness(dirty * percent);
+		
+			if(blood) then
+				if(blood < 0.1) then item:setBloodLevel(0)
+				else item:setBloodLevel(blood * percent) end
+			end
+		end
+	end
+	
+	self.player:resetModel();
+
+end
+
+function SuperSurvivor:isEnemyInRange(enemy)
+	if not enemy then 
+		print(self:getName().." enemy is nil")
+		return false 
+	end
+	
+	local result = self.player:IsAttackRange(enemy:getX(),enemy:getY(),enemy:getZ())
+	--print(self:getName().." my attack range is: " .. tostring(self:getAttackRange()) .. " - " ..tostring(result))
+	
+	return result
 end

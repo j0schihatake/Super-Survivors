@@ -1,4 +1,4 @@
-require "Item/SuburbsDistributions"
+require "Items/SuburbsDistributions"
 
 if(not SSurvivors) then SSurvivors = {} end
 

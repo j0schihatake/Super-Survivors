@@ -43,8 +43,8 @@ function ForageTask:update()
 					options["Berries"] = true;
 					options["MedicinalPlants"] = true;
 					options["ForestGoods"] = true;
-					ISTimedActionQueue.add(ISScavengeAction:new(player, player:getCurrentSquare():getZone(), options));
-					self.parent:Speak(getText("ContextMenu_speech_Foraging"));
+					ISTimedActionQueue.add(ISNPCScavengeAction:new(player, player:getCurrentSquare():getZone(), options));
+					self.parent:Speak(getText("ContextMenu_speech_Foraging"));					
 				else
 					self.parent:Speak(getText("ContextMenu_speech_NoForagingHere").."(" .. tostring(player:getCurrentSquare():getZoneType()) .. ")");
 				end
@@ -53,7 +53,7 @@ function ForageTask:update()
 			
 				local tempx = player:getX() + ZombRand(-2,2);      
 				local tempy = player:getY() + ZombRand(-2,2);
-				local sq = getCell():getOrCreateGridSquare(tempx,tempy,player:getZ());
+				local sq = getCell():getGridSquare(tempx,tempy,player:getZ());
 				if(sq ~= nil) then 
 					player:StopAllActionQueue();
 					self.parent:walkTo(sq); 

@@ -17,11 +17,13 @@ function FindUnlootedBuildingTask:new(superSurvivor)
 	o.WanderDirection = nil
 	o.TicksSinceReversedDir = 0
 	o.parent.TargetBuilding = nil
-	
+	if(o.parent:getSeenCount() == 0) then o.parent:setSneaking(true) end
 	return o
 
 end
-
+function FindUnlootedBuildingTask:OnComplete()
+	self.parent:setSneaking(false)
+end
 function FindUnlootedBuildingTask:isComplete()
 	if(self.parent:inUnLootedBuilding()) or self.parent.TargetBuilding ~= nil then 
 		if (self.parent.TargetBuilding == nil) then self.parent.TargetBuilding = self.parent:getBuilding() end
@@ -37,7 +39,7 @@ end
 function FindUnlootedBuildingTask:update()
 	
 	if(not self:isValid()) then return false end
-	
+	if(self.parent:getSeenCount() == 0) then self.parent:setSneaking(true) end
 	if(self.parent:isInAction() == false) then
 		
 		if(self.TargetSquare == nil) then
@@ -101,7 +103,7 @@ function FindUnlootedBuildingTask:update()
 			
 			local sq = getCell():getGridSquare(self.parent.player:getX() + xoff + ZombRand(-5,5) ,self.parent.player:getY() + yoff + ZombRand(-5,5),0)
 			if(sq ~= nil) then self.parent:walkTo(sq) 
-			else print("error getting walk sq") end
+			else print("error getting walk sq FindNEW BUilding") end
 			
 		else
 		

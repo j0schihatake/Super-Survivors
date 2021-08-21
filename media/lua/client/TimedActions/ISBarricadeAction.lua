@@ -25,6 +25,9 @@ function ISBarricadeAction:isValid()
         if not self.character:hasEquipped("BlowTorch") or not self.character:hasEquipped("MetalBar") then
             return false
         end
+		if self.character:getInventory():getItemCount("Base.MetalBar", true) < 3 then
+			return false
+		end
 	else
 		if barricade and not barricade:canAddPlank() then
 			return false
@@ -49,17 +52,26 @@ function ISBarricadeAction:isValid()
 	return true
 end
 
+function ISBarricadeAction:waitToStart()
+	self.character:faceThisObject(self.item)
+	return self.character:shouldBeTurning()
+end
+
 function ISBarricadeAction:update()
 	self.character:faceThisObject(self.item)
+    self.character:setMetabolicTarget(Metabolics.LightWork);
 end
 
 function ISBarricadeAction:start()
     if self.character:hasEquipped("BlowTorch") then
-        self.sound = self.character:getEmitter():playSound("weldingSound")
+        self:setActionAnim("BlowTorch")
+        self:setOverrideHandModels(self.character:getPrimaryHandItem(), nil)
+        self.sound = self.character:getEmitter():playSound("BlowTorch")
         local radius = 20 * self.character:getWeldingSoundMod()
         addSound(self.character, self.character:getX(), self.character:getY(), self.character:getZ(), radius, radius)
     else
-        self.sound = self.character:getEmitter():playSound("PZ_Hammer")
+        self:setActionAnim("Build")
+        self.sound = self.character:getEmitter():playSound("Hammering")
         local radius = 20 * self.character:getHammerSoundMod()
         addSound(self.character, self.character:getX(), self.character:getY(), self.character:getZ(), radius, radius)
     end
@@ -145,7 +157,7 @@ function ISBarricadeAction:new(character, item, isMetal, isMetalBar, time)
 	if character:HasTrait("Handy") then
 		o.maxTime = time - 20;
     end
-    if character:getAccessLevel() ~= "None" then
+    if character:isTimedActionInstant() then
         o.maxTime = 1;
     end
     o.caloriesModifier = 8;

@@ -14,6 +14,8 @@ function TaskManager:new(superSurvivor)
 	o.TaskCount = 0
 	o.Tasks[0] = nil
 	o.CurrentTask = 0
+	o.LastTask = 0
+	o.LastLastTask = 0
 
 	return o
 
@@ -27,6 +29,13 @@ end
 function TaskManager:AddToTop(newTask)
 	
 	if(newTask == nil) then return false end
+	
+	self.LastLastTask = LastTask
+	self.LastTask = self:getCurrentTask()
+	self.CurrentTask = newTask.Name
+	
+	if(self.LastTask == self.CurrentTask) then print("warning. "..self.parent:getName() .. " task loop? " .. self.CurrentTask) end
+	if(self.LastLastTaskt == self.CurrentTask) then print("warning. "..self.parent:getName() .. " task alternating? " .. self.CurrentTask) end
 	
 	self.TaskUpdateCount = 0
 	for i=self.TaskCount,1,-1 do
@@ -44,6 +53,12 @@ function TaskManager:AddToBottom(newTask)
 	self.Tasks[self.TaskCount] = newTask 
 	self.TaskCount = self.TaskCount + 1
 
+end
+
+function TaskManager:Display()	
+	for i=1,self.TaskCount-1 do
+		if (self.Tasks[i] ~= nil) then return print(self.Tasks[i].Name) end
+	end
 end
 
 function TaskManager:clear()
@@ -106,12 +121,14 @@ function TaskManager:update()
 	self = AIManager(self)
 		
 	local currentTask = self:getCurrentTask()
-	if(self.parent.Reducer % 180 == 0) then self.parent:DebugSay(currentTask..tostring(self.TaskCount) .. ": " .. tostring(self.TaskUpdateCount).."/"..tostring(self.TaskUpdateLimit)) end
+	--if(self.parent.Reducer % 180 == 0) then self.parent:DebugSay(currentTask..tostring(self.TaskCount) .. ": " .. tostring(self.TaskUpdateCount).."/"..tostring(self.TaskUpdateLimit)) end
 		
 	if (self.TaskUpdateLimit ~= 0) and (self.TaskUpdateLimit ~= nil) and (self.TaskUpdateCount > self.TaskUpdateLimit) then
 		self.Tasks[0] = nil
 		self:moveDown()
-	elseif(self.Tasks[0] ~= nil) and (self.Tasks[0] ~= false) and (self.Tasks[0]:isComplete() == false) then 
+	elseif(self.Tasks[0] ~= nil) 
+	and (self.Tasks[0] ~= false) 
+	and (self.Tasks[0]:isComplete() == false) then 
 		self.Tasks[0]:update()
 		self.TaskUpdateCount = self.TaskUpdateCount + 1		
 	else

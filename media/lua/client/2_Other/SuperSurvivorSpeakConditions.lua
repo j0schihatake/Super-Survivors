@@ -127,13 +127,14 @@ SpeechLevel = {};
 
 function LMSConditions.doMoodleCheck(player,LMSMoodleLevel, LMSMoodleType, conditionTable, indexNumber, isDoSecondMoodle, optionalMoodleLevel, optionalMoodleType, optionalIndexNumber)
 	local SID = player:getModData().ID;
+	if(not SID) then return false end
 	if(Speech[SID]== nil) then		
 		Speech[SID] = {};
 		SpeechLevel[SID]= {};
 	end
 		local SS = SSM:Get(SID)
 		
-		if((MoodleType.Panic == LMSMoodleType) and (player:getVehicle()~= nil)) or (SS:isSpeaking()) then return false end
+		if((MoodleType.Panic == LMSMoodleType) and (player:getVehicle()~= nil)) or not SS or (SS:isSpeaking()) then return false end
 	
 		local moodleGet = player:getMoodles():getMoodleLevel(LMSMoodleType)
 		if (Speech[SID] ~= nil) and (SpeechLevel[SID]~= nil) and (moodleGet == LMSMoodleLevel) and ( (Speech[SID][LMSMoodleType] == nil) or (SpeechLevel[SID][LMSMoodleType] == nil) or ((SpeechLevel[SID][LMSMoodleType] ~= moodleGet) or (Speech[SID][LMSMoodleType] ~= LMSMoodleType)) ) then

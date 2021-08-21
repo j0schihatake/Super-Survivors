@@ -37,11 +37,24 @@ function SuperSurvivorGroup:setROE(tothis)
 	self.ROE = tothis
 end
 
+function SuperSurvivorGroup:getFollowCount()
+	local count = 0
+	local members = self:getMembers()
+	for i=1,#members do
+		if(members[i] ~= nil) and (members[i].getCurrentTask ~= nil) then
+			print("SS current task: " .. members[i]:getCurrentTask())
+			if(members[i]:getCurrentTask() == "Follow") then count = count + 1 end
+		end
+	end
+	return count
+end
+
 function SuperSurvivorGroup:isEnemy(SS,character)
 
 	-- zombie is enemy to anyone
 	if character:isZombie() then return true 
 	elseif (SS:isInGroup(character)) then return false
+	elseif (SS.player:getModData().isHostile ~= true and character:getModData().surender == true) then return false -- so other npcs dont attack anyone surendering
 	elseif (SS.player:getModData().hitByCharacter == true) and (character:getModData().semiHostile == true) then return true 
 	elseif (character:getModData().isHostile ~= SS.player:getModData().isHostile) then 
 		--print(tostring(character:getForname()).."("..tostring(character:getModData().Group)..") is enemy to "..SS:getName().."("..tostring(self:getGroupID()))
@@ -123,7 +136,7 @@ function SuperSurvivorGroup:getBaseCenter()
 		local ydiff = (self.Bounds[4] - self.Bounds[3])
 		local z = 0
 		if(self.Bounds[5]) then z = self.Bounds[5] end
-		local centerSquare = getCell():getOrCreateGridSquare(self.Bounds[1]+(xdiff/2),self.Bounds[3]+(ydiff/2),z)
+		local centerSquare = getCell():getGridSquare(self.Bounds[1]+(xdiff/2),self.Bounds[3]+(ydiff/2),z)
 		
 		return centerSquare
 		
@@ -151,7 +164,7 @@ function SuperSurvivorGroup:getRandomBaseSquare()
 		local xrand = ZombRand(math.floor(self.Bounds[1]) , math.floor(self.Bounds[2]))
 		local yrand = ZombRand(math.floor(self.Bounds[3]) , math.floor(self.Bounds[4]))
 		
-		local centerSquare = getCell():getOrCreateGridSquare(xrand,yrand,self.Bounds[5])
+		local centerSquare = getCell():getGridSquare(xrand,yrand,self.Bounds[5])
 		
 		return centerSquare
 		
@@ -314,6 +327,11 @@ end
 
 function SuperSurvivorGroup:addMember(newSurvivor, Role)
 	
+	if(newSurvivor == nil) or (newSurvivor:getID() == nil) then
+		print("cant add survivor to group because id is nil")
+		return false
+	end
+	
 	local currentGroup = newSurvivor:getGroup()
 	if(currentGroup) then
 		currentGroup:removeMember(newSurvivor:getID())
@@ -322,10 +340,7 @@ function SuperSurvivorGroup:addMember(newSurvivor, Role)
 		print("no current group")
 	end
 	
-	if(newSurvivor:getID() == nil) then
-		print("cant add survivor to group because id is nil")
-		return false
-	end
+	
 	
 	--if(newSurvivor:getGroupID() == self.ID) then return false end
 	if(Role == nil) then Role = "Worker" end
@@ -445,7 +460,7 @@ function SuperSurvivorGroup:Load()
 		for i=1,#self.Members do
 			if(self.Members[i] ~= nil) then 
 				self.Members[i] = tonumber(self.Members[i]) 
-				--print (tostring(tabletoSave[2]).. " is a member")
+				print (tostring(self.Members[i]).. " is a member of group: "..tostring(self.ID))
 			end
 		end
 	else self.Members = {} end

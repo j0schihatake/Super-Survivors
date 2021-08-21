@@ -162,7 +162,8 @@ function LootCategoryTask:update()
 					if(item ~= nil) then
 							self.FoundCount = self.FoundCount + 1
 							self.parent:Speak(getText("ContextMenu_SD_TakesFromCont_Before") .. item:getDisplayName() .. getText("ContextMenu_SD_TakesFromCont_After"))							
-						if(self.parent:hasRoomInBagFor(item)) then							
+						if(self.parent:hasRoomInBagFor(item)) then		
+							self.parent:StopWalk()
 							ISTimedActionQueue.add(ISInventoryTransferAction:new (self.parent.player, item, self.Container, self.PlayerBag, nil))
 						else
 							self.parent.player:getInventory():AddItem(item)
@@ -182,7 +183,7 @@ function LootCategoryTask:update()
 				end
 				local distance = getDistanceBetween(self.Container:getWorldItem():getSquare(),self.parent.player)
 				if(distance > 2.0) or (self.parent.player:getZ() ~= self.Floor) then 
-					if(self.parent.player:getPath() == nil) then 
+					if(self.parent.player:getPath2() == nil) then 
 						self.parent.player:StopAllActionQueue()
 						local sq = self.Container:getWorldItem():getSquare()
 						self.parent:walkTo(sq)				

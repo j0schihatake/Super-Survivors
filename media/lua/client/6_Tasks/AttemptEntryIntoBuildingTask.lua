@@ -30,7 +30,10 @@ end
 
 function AttemptEntryIntoBuildingTask:OnComplete()
 	
-	if(self.ReEquipGunOnFinish) then self.parent:reEquipGun() end
+	if(self.ReEquipGunOnFinish) then 
+		self.parent:reEquipGun() 
+		self.parent:setSneaking(false)
+	end
 	
 end
 
@@ -57,8 +60,10 @@ function AttemptEntryIntoBuildingTask:giveUpOnBuilding()
 end
 
 function AttemptEntryIntoBuildingTask:update()
-	local debugOutput = false
+	local debugOutput = self.parent.DebugMode
 	if(not self:isValid()) then return false end
+	
+	if(self.parent:getSeenCount() == 0) then self.parent:setSneaking(true) end
 	
 	if(self.parent:getDangerSeenCount() > 1) or (self.ClimbThroughWindowAttempts > 12) then 
 		print("gave up on building because: (self.ClimbThroughWindowAttempts > 12) or seen zombie close:"..tostring(self.ClimbThroughWindowAttempts))
@@ -84,9 +89,9 @@ function AttemptEntryIntoBuildingTask:update()
 		
 			
 			if not self.TryWindow and not self.TryBreakDoor then
-				if(debugOutput) then self.parent:Speak("not try window") end
+				if(debugOutput) then print( self.parent:getName() .. " " .."not try window") end
 				if(self.parent:getWalkToAttempt(self.TargetSquare) < 10) then
-					if(debugOutput) then self.parent:Speak("trying to get to square inside") end
+					if(debugOutput) then print( self.parent:getName() .. " " .."trying to get to square inside") end
 				if(debugOutput) then 	self.parent:Speak(tostring(self.parent:getWalkToAttempt(self.TargetSquare))) end
 					self.parent:walkTo(self.TargetSquare)
 				else
@@ -94,7 +99,7 @@ function AttemptEntryIntoBuildingTask:update()
 				end
 				
 			elseif self.TryWindow then
-				if(debugOutput) then self.parent:Speak("try window true") end
+				if(debugOutput) then print( self.parent:getName() .. " " .."try window true") end
 				if(self.Window == nil) then
 					self.Window = getCloseWindow(self.parent.TargetBuilding,self.parent.player)
 				end
@@ -134,12 +139,13 @@ function AttemptEntryIntoBuildingTask:update()
 							if(self.parent:isInBase()) then 
 								self.Window:ToggleWindow(self.parent.player)
 							else
+								self.parent:StopWalk()
 								ISTimedActionQueue.add(ISSmashWindow:new(self.parent.player, self.Window, 20))
 							end
 							self.parent:Wait(3)
 						else
 							if (self.Window:isSmashed()) and (self.Window:isGlassRemoved() == false) and self.parent:hasWeapon() then
-								
+								self.parent:StopWalk()
 								ISTimedActionQueue.add(ISRemoveBrokenGlass:new(self.parent.player, self.Window, 20))
 								
 								self.parent:Wait(1)
@@ -161,26 +167,32 @@ function AttemptEntryIntoBuildingTask:update()
 				end
 				
 			elseif self.TryBreakDoor then
-				if(debugOutput) then self.parent:Speak("on try break down door") end
+				if(debugOutput) then print( self.parent:getName() .. " " .."on try break down door") end
 				local doorSquare = getDoorsOutsideSquare(self.Door,self.parent.player)
+				
+				if(doorSquare == nil) then 
+					self:giveUpOnBuilding()
+					print("give up on building because no door")
+				end
+				
 				local distanceToDoor = getDistanceBetween(self.parent.player,doorSquare)
 				
 				if (distanceToDoor > 1.0) then 
 					self.parent:walkToDirect(self.Door)
-					if(debugOutput) then self.parent:Speak("walking to door") end
+					if(debugOutput) then print( self.parent:getName() .. " " .."walking to door") end
 				else
 					
 					if(self.BreakInAttempts > 80) then
-						if(debugOutput) then self.parent:Speak("here i am23") end
+						if(debugOutput) then print( self.parent:getName() .. " " .."here i am23") end
 						self:giveUpOnBuilding()
 						print("gave up on building because: could not seem to break down door")
 					
 					else
-						if(debugOutput) then self.parent:Speak("here i am4") end
+						if(debugOutput) then print( self.parent:getName() .. " " .."here i am4") end
 						if(self.Door) then self.parent.player:faceThisObject(self.Door) end
 						local isInBuilding = (self.parent:getBuilding() == self.TargetBuilding)
 						if (self.Door) then --(not isInBuilding) then
-							if(debugOutput) then self.parent:Speak("here i am") end
+							if(debugOutput) then print( self.parent:getName() .. " " .."here i am") end
 							if(not self.Toggle) or (self.Door == nil) then self.parent:walkTo(self.TargetSquare)
 							else self.parent.player:AttemptAttack() end
 							
@@ -188,7 +200,7 @@ function AttemptEntryIntoBuildingTask:update()
 							self.BreakInAttempts = self.BreakInAttempts + 1
 							
 						elseif(self.Door == nil) then
-							if(debugOutput) then self.parent:Speak("in building, complete") end
+							if(debugOutput) then print( self.parent:getName() .. " " .."in building, complete") end
 							return true
 						end
 					end

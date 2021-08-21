@@ -15,7 +15,7 @@ function HoldStillTask:new(superSurvivor, playerInitiated)
 	o.Ticks = 0
 	o.Spoke = false
 	o.Complete = false
-	StopWalk(o.parent.player)
+	o.parent:StopWalk()
 	o.parent:setWalkingPermitted(false)
 	o.playerMoved = false
 	superSurvivor:Speak("!?")
@@ -60,7 +60,7 @@ function HoldStillTask:update()
 	
 	if(self.parent:isInAction()) then
 		
-		StopWalk(self.parent.player)	
+		self.parent:StopWalk()	
 	
 	end
 

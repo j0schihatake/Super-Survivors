@@ -7,7 +7,7 @@ function FollowTask:new(superSurvivor, FollowMeplayer)
 	setmetatable(o, self)
 	self.__index = self
 	
-	
+	print(superSurvivor:getName()..": new follow task");
 	if(FollowMeplayer == nil) then
 		if(superSurvivor.player:getModData().FollowCharID ~= nil) then
 			local SS = SSM:Get(superSurvivor.player:getModData().FollowCharID)
@@ -19,6 +19,8 @@ function FollowTask:new(superSurvivor, FollowMeplayer)
 		superSurvivor.player:getModData().FollowCharID = FollowMeplayer:getModData().ID -- save last follow obj id to mod data so can be reused on load
 	end
 	
+	o.followSS = SSM:Get(o.FollowChar:getModData().ID)
+	o.group = o.followSS:getGroup()
 	o.InBaseAtStart = superSurvivor:isInBase()
 	o.parent = superSurvivor
 	o.Name = "Follow"
@@ -26,6 +28,13 @@ function FollowTask:new(superSurvivor, FollowMeplayer)
 	o.LastDistance = 0
 	o.Complete = false
 	o.MySeat = -1
+	o.FollowDistanceOffset = 0
+	
+	if(o.group~=nil) then
+		--o.FollowDistanceOffset = ((o.group:getFollowCount()-1) * 3)
+		o.FollowDistanceOffset = 0
+		print(superSurvivor:getName()..": setting distance offset to " .. tostring(o.FollowDistanceOffset))
+	end
 	
 	return o
 
@@ -43,7 +52,9 @@ end
 
 function FollowTask:needToFollow()
 	local distance = getDistanceBetween(self.parent.player,self.FollowChar)
-		if (distance > GFollowDistance) or self.parent:Get():getVehicle() or (self.FollowChar:getVehicle() ~= self.parent:Get():getVehicle() ) then return true
+		if (distance > GFollowDistance+self.FollowDistanceOffset) or (self.parent:getBuilding() ~= self.FollowChar:getCurrentSquare():getBuilding()) or self.parent:Get():getVehicle() or (self.FollowChar:getVehicle() ~= self.parent:Get():getVehicle() ) then 
+		--print(self.parent:getName().." needs to follow");
+		return true
 		else return false end
 end
 
@@ -53,9 +64,12 @@ function FollowTask:update()
 	if(not self:isValid()) then return false end
 	
 	local distance = getDistanceBetween(self.parent.player,self.FollowChar)
-	if(distance > self.LastDistance) then StopWalk(self.parent:Get()) end
+	--if(distance > self.LastDistance) then self.parent:StopWalk() end
 	
-	if(self.parent:isInAction() == false) then
+	self.parent:setSneaking(self.FollowChar:isSneaking()) -- sneaking if perosn you follow is
+	--print(self.parent:getName()..": isInAction = "..tostring(self.parent:isInAction()))
+	
+		if(true) then -- self.parent:isInAction() == false) then -- for some reason this is true when they doing nothing sometimes...
 		
 		if(self.InBaseAtStart == true) and ( not self.parent:isInBase()) then 
 			if(ZombRand(2)==0) then self.parent:Speak(getText("ContextMenu_SD_WeLooting")) end
@@ -67,7 +81,8 @@ function FollowTask:update()
 		end
 		
 		
-		if (distance > (GFollowDistance+5)) or (self.FollowChar:getVehicle() ~= self.parent:Get():getVehicle()) then self.parent:setRunning(true)
+		if (distance > (GFollowDistance+self.FollowDistanceOffset+5)) or (self.FollowChar:getVehicle() ~= self.parent:Get():getVehicle()) then 
+		self.parent:setRunning(true)
 		else self.parent:setRunning(false) end
 	
 	
@@ -91,6 +106,7 @@ function FollowTask:update()
 				local window = getSquaresNearWindow(ropeSquare)
 				if(window) then
 				
+					self.parent:StopWalk()
 					local indoorSquare = window:getIndoorSquare()
 					ISTimedActionQueue.add(ISWalkToTimedAction:new(self.parent.player, indoorSquare))
 					ISTimedActionQueue.add(ISClimbThroughWindow:new(self.parent.player, window, 20))
@@ -104,8 +120,8 @@ function FollowTask:update()
 		end
 		
 		if not ropeSquare then
-		
-			if (distance > GFollowDistance) and (self.parent:Get():getVehicle() == nil) then
+			--print(self.parent:getName()..tostring(self.FollowChar:getVehicle() ~= nil) .. " and " .. tostring(self.parent:Get():getVehicle() == nil))
+			if (distance > (GFollowDistance+self.FollowDistanceOffset)) and (self.parent:Get():getVehicle() == nil) then
 				
 				local gotosquare = self.FollowChar:getCurrentSquare()
 				if(gotosquare ~= nil) then
@@ -116,13 +132,14 @@ function FollowTask:update()
 					--self.parent.player:Say("walkTo")
 				end
 			elseif (self.FollowChar:getVehicle() ~= nil) and (self.parent:Get():getVehicle() == nil) then
-				--self.parent:Speak("get in car")
+				print(self.parent:getName().." get in car")
 				local car = self.FollowChar:getVehicle()
 				self.MySeat = -1
 				local doorseat = -1
 				local lastgoodDoor = nil
 				local tempDoor = nil
 				local numOfSeats = car:getScript():getPassengerCount()
+				print(self.parent:getName().."number of seats: " .. tostring(numOfSeats))
 				 for seat = numOfSeats-1, 1, -1  do
 					tempDoor = car:getPassengerDoor(seat)
 					if(tempDoor ~= nil) then
@@ -131,12 +148,12 @@ function FollowTask:update()
 					end
 					if(self.MySeat == -1) and (car:isSeatOccupied(seat) == false) then
 						self.MySeat = seat 
-						--self.parent:Speak("my seat is " .. tostring(seat))						
+						print(self.parent:getName().."my seat is " .. tostring(seat))						
 					end
 					if(doorseat ~= -1) and (self.MySeat ~= -1) then break end
 				end
-				--self.parent:Speak("door seat is " .. tostring(doorseat))
-				--self.parent:Speak(tostring(self.MySeat)..","..tostring(lastgoodDoor))
+				print("door seat is " .. tostring(doorseat))
+				print(self.parent:getName()..tostring(self.MySeat)..","..tostring(lastgoodDoor))
 				if(self.MySeat ~= -1) then 
 				
 					local doorsquare
@@ -144,11 +161,13 @@ function FollowTask:update()
 					doorsquare = lastgoodDoor
 					
 					if(doorsquare ~= nil) then
-					
-						ISTimedActionQueue.add(ISWalkToTimedAction:new(self.parent:Get(),doorsquare))
-						
+						self.parent:StopWalk()
+						print(self.parent:getName()..": adding enter vehicle timed actions and waiting")
+						ISTimedActionQueue.add(ISWalkToTimedAction:new(self.parent:Get(),doorsquare))						
 						ISTimedActionQueue.add(ISEnterVehicle:new(self.parent:Get(), self.FollowChar:getVehicle(), doorseat))
 						ISTimedActionQueue.add(ISSwitchVehicleSeat:new(self.parent:Get(), self.MySeat))
+						self.parent:Wait(4)
+						
 					end
 					
 				end
@@ -157,6 +176,7 @@ function FollowTask:update()
 			elseif (self.FollowChar:getVehicle() == nil) and (self.parent:Get():getVehicle() ~= nil) then
 				self.MySeat = -1
 				ISTimedActionQueue.add(ISExitVehicle:new(self.parent:Get()))
+				self.parent:Wait(1)
 			else
 				--self.parent:Speak("ELSE")
 			end

@@ -78,8 +78,8 @@ function BarricadeBuildingTask:update()
 					--print("window NOT found") 
 					self.Complete = true
 					return false
-				else
-					--print("window found")
+				else 
+					--print("window found") 
 				end
 				
 			else 
@@ -101,11 +101,10 @@ function BarricadeBuildingTask:update()
 				self.parent.player:setSecondaryHandItem(self.Plank)
 				if not self.parent.player:getInventory():contains("Nails", true) then self.parent.player:getInventory():AddItem("Base.Nails") end
 									
-				if(self.parent.player.setVehicle4TestCollision ~= nil) then
-					ISTimedActionQueue.add(ISBarricadeActionNEW:new(self.parent.player, self.Window, false, false, 100));
-				else
-					ISTimedActionQueue.add(ISBarricadeAction:new(self.parent.player, self.Window, false, false, 100));
-				end
+				
+				self.parent:StopWalk()
+				ISTimedActionQueue.add(ISBarricadeAction:new(self.parent.player, self.Window, false, false, 100));
+		
 				
 				self.Window = nil
 			else

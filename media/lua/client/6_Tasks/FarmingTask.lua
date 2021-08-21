@@ -21,10 +21,7 @@ function FarmingTask:new(superSurvivor, BringHere)
 	
 	o.Seeds = {"farming.BroccoliSeed","farming.CabbageSeed","farming.CarrotSeed","farming.PotatoSeed","farming.TomatoSeed","farming.RedRadishSeed"}
 	
-	if(o.group:getGroupAreaCenterSquare("FarmingArea") == nil) then
-		superSurvivor:Speak(getText("ContextMenu_speech_NoFarmingArea"))
-		return nil
-	end
+	
 	
 	return o
 
@@ -246,6 +243,15 @@ end
 function FarmingTask:update()
 
 	if(not self:isValid()) then return false end
+	if(not self.group) then self.group = self.parent:getGroup() end
+	
+	
+	if(self.group:getGroupAreaCenterSquare("FarmingArea") == nil) then
+		self.parent:Speak(getText("ContextMenu_speech_NoFarmingArea"))
+		self.Complete = true
+		return nil
+	end
+	
 	
 	if(self.parent:isInAction() == false) then
 	
@@ -261,7 +267,7 @@ function FarmingTask:update()
 			if(not dest) then dest = self.parent.player:getCurrentSquare() end
 			self.JustHarvested = false
 			--self.parent:Speak("is a container?"..tostring(dest.getContainer ~= nil))
-			self.parent:getTaskManager():AddToTop(CleanInvTask:new(self.parent,dest))
+			self.parent:getTaskManager():AddToTop(CleanInvTask:new(self.parent,dest,false))
 			return true
 		end
 	
@@ -276,6 +282,7 @@ function FarmingTask:update()
 				local item = self:getWater()
 				if(item and item:isWaterSource()) then
 					if(self.parent:isSpeaking() == false) then self.parent:Speak(getText("ContextMenu_speech_FarmingActionWatering")) end
+					self.parent:StopWalk()
 					ISTimedActionQueue.add(ISWaterPlantAction:new(self.parent:Get(), item, 1, self.Plant:getSquare(), 20))
 					self:ClearVars()
 				else
@@ -293,6 +300,7 @@ function FarmingTask:update()
 			if(self:AreWeThereYet(self.Plant:getSquare())) then
 				self.parent:Speak(getText("ContextMenu_speech_FarmingActionHarvesting"))
 				self.JustHarvested = true
+				self.parent:StopWalk()
 				ISTimedActionQueue.add(ISHarvestPlantAction:new(self.parent:Get(), self.Plant, 150))
 				self:ClearVars()
 			end
@@ -307,6 +315,7 @@ function FarmingTask:update()
 			self.TargetSquare = self.Plant:getSquare()
 			if(self:AreWeThereYet(self.Plant:getSquare())) then
 				--self.parent:Speak("plowing square")
+				self.parent:StopWalk()
 				ISTimedActionQueue.add(ISPlowAction:new (self.parent:Get(), self.TargetSquare, self:getShovel(), 150))
 				self:ClearVars()
 			end
@@ -328,6 +337,7 @@ function FarmingTask:update()
 					elseif(plantType == "BroccoliSeed") then plantType = "Broccoli"
 					elseif(plantType == "PotatoSeed") then plantType = "Potatoes"
 					else plantType = plantType:gsub('Seed', 's') end
+					self.parent:StopWalk()
 					ISTimedActionQueue.add(ISSeedAction:new(self.parent:Get(), seeds, #seeds, plantType, self.Plant, 200))
 					self:ClearVars()
 				end
@@ -344,6 +354,7 @@ function FarmingTask:update()
 			--self.parent:Speak("should plowing new square")
 			if(self:AreWeThereYet(self.TargetSquare)) then
 				--self.parent:Speak("plowing new square")
+				self.parent:StopWalk()
 				ISTimedActionQueue.add(ISPlowAction:new (self.parent:Get(), self.TargetSquare, self:getShovel(), 150))
 				self:ClearVars()				
 			end

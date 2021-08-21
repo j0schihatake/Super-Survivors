@@ -49,7 +49,7 @@ function SurvivorOrder(test,player,order,orderParam)
 		TaskMangerIn:AddToTop(ForageTask:new(ASuperSurvivor))
 		ASuperSurvivor:setGroupRole("Worker") 
 		elseif(order == "Farming") then 
-			if(ASuperSurvivor:Get():getPerkLevel(Perks.FromString("Farming")) >= 3) then
+			if(true) then--if(ASuperSurvivor:Get():getPerkLevel(Perks.FromString("Farming")) >= 3) then
 				TaskMangerIn:AddToTop(FarmingTask:new(ASuperSurvivor))
 				ASuperSurvivor:setGroupRole("Farmer") 
 			else
@@ -82,7 +82,7 @@ function SurvivorOrder(test,player,order,orderParam)
 		elseif(order == "Go Find Food") then TaskMangerIn:AddToTop(FindThisTask:new(ASuperSurvivor,"Food","Category",1))
 		elseif(order == "Go Find Weapon") then TaskMangerIn:AddToTop(FindThisTask:new(ASuperSurvivor,"Weapon","Category",1))
 		elseif(order == "Go Find Water") then TaskMangerIn:AddToTop(FindThisTask:new(ASuperSurvivor,"Water","Category",1))
-		elseif(order == "Clean Up Inventory") then TaskMangerIn:AddToTop(CleanInvTask:new(ASuperSurvivor,getSpecificPlayer(0)))
+		elseif(order == "Clean Up Inventory") then TaskMangerIn:AddToTop(CleanInvTask:new(ASuperSurvivor,getSpecificPlayer(0),false))
 		elseif(order == "Doctor") and (ASuperSurvivor:Get():getPerkLevel(Perks.FromString("Doctor")) >= 3) then 
 			TaskMangerIn:AddToTop(DoctorTask:new(ASuperSurvivor))
 			ASuperSurvivor:setGroupRole("Doctor")
@@ -104,10 +104,28 @@ function MedicalCheckSurvivor(test,player)
 end
 
 function AskToJoin(test,player)
+
 	local SS = SSM:Get(player:getModData().ID)
+	local MySS = SSM:Get(0)
 	getSpecificPlayer(0):Say(getText("ContextMenu_SD_CanIJoin"))		
-	SS:getCurrentTask():Talked()
-	player:Say("No");
+	
+	local Relationship = SS:getRelationshipWP()
+	--player:Say(tostring(Relationship))
+	local result = ((ZombRand(10) + Relationship) >= 8)
+	
+	if(result) then
+		local group = SS:getGroup()
+		
+		if(group) then
+			SS:Speak(getSpeech("Roger"));
+			local members = MySS:getGroup():getMembers()
+			for x=1, #members do
+				if(members[x] and members[x].player ~= nil) then group:addMember(members[x],"Worker") end
+			end
+		end
+	else
+		SS:Speak(getSpeech("No"))
+	end
 	
 end
 function InviteToParty(test,player)
@@ -236,6 +254,115 @@ function OfferWeapon(test,player)
 	SS:PlusRelationshipWP(1.5)
 end
 
+function AskToLeave(test,SS)
+	getSpecificPlayer(0):Say("Scram! Or Die!");
+	
+	if(SS:getBuilding() ~= nil) then SS:MarkBuildingExplored(SS:getBuilding()) end
+	if(SS.TargetBuilding ~= nil) then SS:MarkBuildingExplored(SS.TargetBuilding) end
+	
+	getSpecificPlayer(0):getModData().semiHostile = true
+	SS.player:getModData().hitByCharacter = true
+	SS:getTaskManager():clear()
+	SS:getTaskManager():AddToTop(FleeFromHereTask:new(SS,getSpecificPlayer(0):getCurrentSquare()))
+	
+		local GroupID = SS:getGroupID()
+		if(GroupID ~= nil) then
+			local group = SSGM:Get(GroupID)
+			if(group) then
+			print("pvp alert being scrammed")
+				group:PVPAlert(getSpecificPlayer(0))
+			end		
+		end
+		SS.player:getModData().hitByCharacter = true
+	
+	SS:Speak("!!")
+end
+function AskToDrop(test,SS)
+	getSpecificPlayer(0):Say("Drop your Loot!!");
+	SS:Speak("Okay dont shoot!");
+	if(SS:getBuilding() ~= nil) then SS:MarkBuildingExplored(SS:getBuilding()) end
+	if(SS.TargetBuilding ~= nil) then SS:MarkBuildingExplored(SS.TargetBuilding) end
+	getSpecificPlayer(0):getModData().semiHostile = true
+	--SS.player:getModData().hitByCharacter = true
+	SS:getTaskManager():clear()
+	SS:getTaskManager():AddToTop(FleeFromHereTask:new(SS,getSpecificPlayer(0):getCurrentSquare()))
+	SS:getTaskManager():AddToTop(CleanInvTask:new(SS, SS.player:getCurrentSquare(),true))
+	
+	local GroupID = SS:getGroupID()
+		if(GroupID ~= nil) then
+			local group = SSGM:Get(GroupID)
+			if(group) then
+				print("pvp alert being robbed")
+				group:PVPAlert(getSpecificPlayer(0))
+			end		
+		end
+		SS.player:getModData().hitByCharacter = true
+	
+	SS:Speak("!!")
+end
+
+function DebugCharacterSwap(test,SS)
+	SSM:switchPlayer(SS:getID())
+end
+function DebugCharacterKill(test,SS)
+	local player = SS.player
+	
+	if(player:getBodyDamage():getInfectionLevel() <= 0) then
+	
+		local BPs = player:getBodyDamage():getBodyParts()
+		for i=0, BPs:size()-1 do	
+			
+			BPs:get(i):SetBitten(true)
+			BPs:get(i):generateZombieInfection(200)
+			BPs:get(i):AddDamage(19)
+			
+			player:getBodyDamage():setInfectionLevel(1)  
+			
+		end
+		
+	end
+	player:update();
+end
+function DebugCharacterToggleNPC(test,SS)
+	SS:Get():setNPC(not SS:Get():isNPC())
+end
+function DebugCharacterToggleBM(test,SS)
+	SS:Get():setBlockMovement(not SS:Get():isBlockMovement())
+end
+
+
+function DebugCharacterOutput(test,SS)
+	SS.DebugMode = not SS.DebugMode
+	print("SS Name:"..tostring(SS:getName()))
+	print("SS ID:"..tostring(SS:getID()))
+	print("isBlockMovement:"..tostring(SS:Get():isBlockMovement()))
+	print("isNPC:"..tostring(SS:Get():isNPC()))
+	print("isLocalPlayer:"..tostring(SS:Get():isLocalPlayer()))
+	print("NPCRunning:"..tostring(SS:Get():NPCGetRunning()))
+	print("isSneaking:"..tostring(SS:Get():isSneaking()))
+	print("isAiming:"..tostring(SS:Get():isAiming()))
+	print("infectionLevel:"..tostring(SS:Get():getBodyDamage():getInfectionLevel()))
+	print("isinAction:"..tostring(SS:isInAction()))
+	print("bWalking:"..tostring(SS.player:getModData().bWalking))
+	print("isBehaviourMoving:"..tostring(SS.player:isBehaviourMoving()))
+	print("isMoving:"..tostring(SS.player:isMoving()))
+	print("isPerformingAnAction:"..tostring(SS:Get():isPerformingAnAction()))
+	print("TaskManagerOutput:")
+	SS:getTaskManager():Display()
+	--SS:StopWalk()
+end
+
+function DebugCharacterUnStuck(test,SS)
+	
+	SS.player:setNPC(false)
+	SS.player:setBlockMovement(false)
+	SS.player:update()
+	SS.player:setNPC(true)
+	SS.player:setBlockMovement(true)
+	
+	
+end
+
 function OfferArmor(test,SS,item)
 	local player = SS:Get()
 	getSpecificPlayer(0):Say(getText("ContextMenu_SD_TakeArmor"))	
@@ -281,8 +408,27 @@ function SwapWeaponsSurvivor(test,SS, Type)
 	if(PP == PS) then getSpecificPlayer(0):setSecondaryHandItem(nil); end
 	local SNW = player:getInventory():AddItem(PP);
 	
-	player:setPrimaryHandItem(SNW);
+	player:setPrimaryHandItem(SNW)
+	if(SNW:isRequiresEquippedBothHands()) then player:setSecondaryHandItem(SNW) end
+	if(player:getSecondaryHandItem() == toPlayer) then 
+		player:setSecondaryHandItem(nil) 
+		player:removeFromHands(nil) 
+	end
 	getSpecificPlayer(0):getInventory():Remove(PP);
+	
+	if SNW and SNW:getBodyLocation() ~= "" then
+		player:removeFromHands(nil)
+		player:setWornItem(item:getBodyLocation(), SNW);
+	end	
+	triggerEvent("OnClothingUpdated", player)
+	player:initSpritePartsEmpty();
+	
+	if PNW and PNW:getBodyLocation() ~= "" then
+		getSpecificPlayer(0):removeFromHands(nil)
+		getSpecificPlayer(0):setWornItem(item:getBodyLocation(), PNW);
+	end	
+	triggerEvent("OnClothingUpdated", getSpecificPlayer(0))
+	getSpecificPlayer(0):initSpritePartsEmpty();
 
 end
 
@@ -305,9 +451,9 @@ end
 
 function TalkToSurvivor(test,SS)
 	getSpecificPlayer(0):Say(getText("ContextMenu_SD_HelloThere"))		
-	
+		
 	if SS:Get():CanSee(getSpecificPlayer(0)) then 
-		if(SS:Get():getModData().Greeting ~= nil) then SS:Speak(player:getModData().Greeting)
+		if(SS:Get():getModData().Greeting ~= nil) then SS:Speak(SS:Get():getModData().Greeting)
 		else SS:Speak(getSpeech("IdleChatter")) end
 	else 
 		SS:Speak(getText("ContextMenu_SD_WhoSaidThat"));
@@ -327,29 +473,38 @@ function CallSurvivor(test,player)
 end
 
 function survivorMenu(context,o)
-	if(instanceof(o, "IsoPlayer") and o:getModData().ID ~= nil and o:getModData().ID ~= 0) then -- make sure its a valid survivor
+	if(instanceof(o, "IsoPlayer") and o:getModData().ID ~= nil and o:getModData().ID ~= SSM:getRealPlayerID()) then -- make sure its a valid survivor
 		local ID = o:getModData().ID
 		local SS = SSM:Get(o:getModData().ID)
 		local survivorOption = context:addOption(SS:getName(), worldobjects, nil);
 		local submenu = context:getNew(context);
-		
+				
+		if(SS.player:getModData().surender) then submenu:addOption("Scram!", nil, AskToLeave, SS, nil) end
+		if(SS.player:getModData().surender) then submenu:addOption("Drop Your loot!", nil, AskToDrop, SS, nil) end
 		if (o:getModData().isHostile ~= true) then
 			local medicalOption = submenu:addOption(getText("ContextMenu_Medical_Check"), nil, MedicalCheckSurvivor, o, nil);
-			local toolTip = makeToolTip(medicalOption,"Medical / First Aid Check","Walk to this survivor and medical check him, if they move the process can be interupted");
+			local toolTip = makeToolTip(medicalOption,"Medical / First Aid Check","Walk to this survivor and medical check him, if they move the process can be interupted");							
+			
+			if (DebugOptions) then submenu:addOption("Debug Character Swap", nil, DebugCharacterSwap, SS, nil) end -- debut character swap
+			if (DebugOptions) then submenu:addOption("Debug Infect&Murder Character", nil, DebugCharacterKill, SS, nil) end -- debut character swap
+			--if (DebugOptions) then submenu:addOption("Debug Toggle isBM ("..tostring(o:getModData().ID)..")", nil, DebugCharacterToggleBM, SS, nil) end -- debut character swap
+			--if (DebugOptions) then submenu:addOption("Debug Toggle isNPC ("..tostring(o:getModData().ID)..")", nil, DebugCharacterToggleNPC, SS, nil) end -- debut character swap
+			if (DebugOptions) then submenu:addOption("Debug Character Ouput", nil, DebugCharacterOutput, SS, nil) end -- debut character swap
+			if (DebugOptions) then submenu:addOption("Debug Unstuck", nil, DebugCharacterUnStuck, SS, nil) end -- debut character swap
 		end		
-		if (o:getModData().isHostile ~= true) and ((SS:getTaskManager():getCurrentTask() == "Listen") or (SS:getTaskManager():getCurrentTask() == "Take Gift")) then
+		if (o:getModData().isHostile ~= true) and ( (SS:getTaskManager():getCurrentTask() == "Listen") or (SS:getTaskManager():getCurrentTask() == "Take Gift") or (getDistanceBetween(SS:Get(),getSpecificPlayer(0)) < 2) ) then
 			local selectOption = submenu:addOption(getText("ContextMenu_SD_TalkOption"), nil, TalkToSurvivor, SS, nil);
 			local toolTip = makeToolTip(selectOption,getText("ContextMenu_SD_TalkOption"),getText("ContextMenu_SD_TalkOption_Desc"));
 			if((SS:getGroupID() ~= SSM:Get(0):getGroupID()) or SS:getGroupID() == nil) then -- not in group
 				if (o:getModData().NoParty ~= true) then
 					submenu:addOption(getText("ContextMenu_SD_InviteToGroup"), nil, InviteToParty, o, nil);
 				end
-				if ((SS:getGroupID() ~= nil) and (SS:getGroupID() ~= SSM:Get(0):getGroupID())) and (o:getModData().NoParty ~= true) then
+				if ((SS:getGroupID() ~= nil) and (SS:getGroupID() ~= SSM:Get(0):getGroupID())) --[[and (o:getModData().NoParty ~= true)]] then
 					submenu:addOption(getText("ContextMenu_SD_AskToJoin"), nil, AskToJoin, o, nil);
 				end				
 				if ((o:getPrimaryHandItem() == nil) and (getSpecificPlayer(0):getPrimaryHandItem() ~= nil) ) then
 					submenu:addOption(getText("ContextMenu_SD_OfferWeapon"), nil, OfferWeapon, o, nil);
-				end
+				end				
 			elseif((SS:getGroupID() == SSM:Get(0):getGroupID()) and SS:getGroupID() ~= nil) then
 				---orders
 				local i = 1;
@@ -435,21 +590,22 @@ function survivorMenu(context,o)
 				submenu:addOption(getText("ContextMenu_SD_OfferWater"), nil, OfferWater, o, nil);
 			end
 			
-			if(GlobalArmor ~= nil) and (ArmorisArmorEquipped ~= nil) then 
-				local armors = SSM:Get(0):getUnEquipedArmors()
-				if(armors) then
-				
-					local selectOption = submenu:addOption(getText("ContextMenu_SD_OfferArmor"), worldobjects, nil);
-					local armormenu = submenu:getNew(submenu);
+			
+			local armors = SSM:Get(0):getUnEquipedArmors()
+			if(armors) then
+				--getSpecificPlayer(0):Say("hereiam2")
+				local selectOption = submenu:addOption(getText("ContextMenu_SD_OfferArmor"), worldobjects, nil);
+				local armormenu = submenu:getNew(submenu);
 
-					for i=1, #armors do
-						armormenu:addOption(armors[i]:getDisplayName(), nil, OfferArmor, SS, armors[i])
-					end
-					
-					submenu:addSubMenu(selectOption, armormenu);
-				
+				for i=1, #armors do
+					--getSpecificPlayer(0):Say("hereiam2" .. armors[i]:getDisplayName())
+					armormenu:addOption(armors[i]:getDisplayName(), nil, OfferArmor, SS, armors[i])
 				end
+				
+				submenu:addSubMenu(selectOption, armormenu);
+			
 			end
+			
 			
 			local ammoBox 
 			for i=1,#SS.AmmoBoxTypes do			
@@ -488,7 +644,7 @@ function SurvivorsSquareContextHandle(square,context)
 	
 		for i=0,square:getMovingObjects():size()-1 do
 			local o = square:getMovingObjects():get(i)
-			if(instanceof(o, "IsoPlayer")) and (getSpecificPlayer(0) ~= o) and (o:getModData().isHostile ~= true) and (o:getModData().ID ~= 0) then
+			if(instanceof(o, "IsoPlayer")) and (o:getModData().ID ~= SSM:getRealPlayerID()) then
 				survivorMenu(context,o);
 			end			
 		end		

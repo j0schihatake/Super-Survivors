@@ -300,7 +300,7 @@ ContextMenu_EN = {
 	
 	ContextMenu_SD_CallOver = "Call Over",
 	ContextMenu_SD_CallOverDesc = "Ask this survivor to come over and talk",
-	ContextMenu_SD_OfferArmor = "Offer Armor",
+	ContextMenu_SD_OfferArmor = "Give Clothes",
 	ContextMenu_SD_OfferAmmoBox = "Offer Ammo Box",
 	ContextMenu_SD_OfferAmmoRound = "Offer Ammo Round",
 	ContextMenu_SD_TalkOption = "Talk",
